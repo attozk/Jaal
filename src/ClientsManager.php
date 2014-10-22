@@ -1,6 +1,6 @@
 <?php
 
-namespace Attozk\Roxy\Http;
+namespace Attozk\Roxy;
 
 use React\Promise\Deferred;
 use React\Socket\ConnectionInterface;
@@ -13,13 +13,19 @@ class ClientsManager
     protected $loop;
 
     /**
+     * http, ftp etc..
+     */
+    private $protocol;
+
+    /**
      * @var array
      */
-    private $clients = array();
+    public static $clients = array();
 
-    public function __construct($loop)
+    public function __construct($loop, $protocol)
     {
         $this->loop = $loop;
+        $this->protocol = $protocol;
     }
 
     public function remove(ConnectionInterface $client)
