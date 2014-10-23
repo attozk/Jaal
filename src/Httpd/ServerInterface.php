@@ -1,6 +1,6 @@
 <?php
 
-namespace Attozk\Roxy\Http;
+namespace Attozk\Jaal\Httpd;
 
 interface ServerInterface
 {

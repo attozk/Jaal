@@ -1,6 +1,6 @@
 {
-    "name": "attozk/roxy",
-    "description": "PHP asynchronous Elasticsearch client",
+    "name": "attozk/jaal",
+    "description": "PHP asynchronous network proxy",
     "version": "0.1.0",
     "keywords": ["elasticsearch", "async"],
     "license": "MIT",
@@ -13,16 +13,19 @@
     ],
     "require": {
         "php": ">=5.4.0",
+        "ext-zlib": "*",
         "react/socket": "0.4.*",
         "react/socket-client": "0.4.*",
         "react/promise": "~2.0",
         "react/http-client": "dev-master",
         "ruflin/elastica" : "1.3.4.0",
+        "symfony/yaml": "2.5.5",
+        "dflydev/dot-access-configuration": "1.0.0",
         "guzzle/guzzle": "3.9.*@dev"
     },
     "autoload": {
         "psr-4": {
-            "Attozk\\Roxy\\": "src"
+            "Attozk\\Jaal\\": "src"
         }
     }
 }

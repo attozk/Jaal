@@ -1,18 +1,19 @@
 <?php
 
-namespace Attozk\Roxy\Http;
+namespace Attozk\Jaal\Httpd;
 
-use Attozk\Roxy\ClientsManager;
-use Attozk\Roxy\Http\Message\RequestFactory;
-use Attozk\Roxy\Http\Message\RequestInterface;
-use Attozk\Roxy\Http\Message\RequestUpstream;
-use Attozk\Roxy\Http\Message\Response;
-use Attozk\Roxy\UpstreamManager;
+use Attozk\Jaal\ClientsManager;
+use Attozk\Jaal\Httpd\Message\RequestFactory;
+use Attozk\Jaal\Httpd\Message\RequestInterface;
+use Attozk\Jaal\Httpd\Message\RequestUpstream;
+use Attozk\Jaal\Httpd\Message\Response;
+use Attozk\Jaal\Upstream\PoolInterface;
+use Attozk\Jaal\Upstream\UpstreamManager;
 use Evenement\EventEmitter;
 use React\EventLoop\LoopInterface;
 use React\Socket\ConnectionInterface;
 use React\Socket\Server as TCPServer;
-use React\Dns\Resolver;
+use React\Dns\Resolver\Resolver;
 
 /** @event connection */
 class Server extends EventEmitter implements ServerInterface
@@ -51,7 +52,7 @@ class Server extends EventEmitter implements ServerInterface
      * @param TCPServer $socket
      * @param Resolver $dns
      */
-    public function __construct(LoopInterface $loop, TCPServer $socket, /*Resolver*/ $dns)
+    public function __construct(LoopInterface $loop, TCPServer $socket, Resolver $dns)
     {
         $this->loop = $loop;
         $this->socket = $socket;
@@ -75,15 +76,11 @@ class Server extends EventEmitter implements ServerInterface
 
     private function init()
     {
-        $this->socket->on('connection', function(ConnectionInterface $client) {
-
-            echo $client->getRemoteAddress() . " has connected \n";
+        $this->socket->on('connection', function (ConnectionInterface $client) {
 
             $microtime = microtime();
             $this->clientsManager->isAllowed($client)->then(
                 function ($client) use ($microtime) {
-
-                    echo $client->getRemoteAddress() . " is allowed to connect \n";
 
                     $client->on('close', function (ConnectionInterface $client) {
                         $this->handleClose($client);
@@ -95,18 +92,16 @@ class Server extends EventEmitter implements ServerInterface
 
                     $client->on('data', function ($data) use ($client, $microtime) {
 
-                        /** @var $request \Attozk\Roxy\Http\Message\Request */
+                        /** @var $request \Attozk\Jaal\Httpd\Message\Request */
                         $request = RequestFactory::getInstance()->fromMessage($data);
-                        $request->setStartTime($microtime)->setClientSocket($client);
+                        $request->setClientSocket($client);
 
                         $this->handleRequest($request);
                     });
 
                 },
                 // @TODO error handle
-                function ($error) use($client) {
-                    echo $client->getRemoteAddress() . " is not allowed to connect \n";
-
+                function ($error) use ($client) {
                     $client->end();
                 }
             );
@@ -115,33 +110,12 @@ class Server extends EventEmitter implements ServerInterface
     }
 
     /**
-     * @param $pool
-     * @param RequestInterface $request
-     * @return null|\React\Promise\FulfilledPromise|\React\Promise\RejectedPromise
+     * @emit client.error
+     * @param ConnectionInterface $client
      */
-    public function getUpstream($pool, RequestInterface $request)
+    protected function handleError(ConnectionInterface $client)
     {
-
-    }
-
-    public function proxy($pool, RequestInterface $request, $arrOptions)
-    {
-        $connector = $this->upstreamManager->buildConnector();
-        $requestUpstream = new RequestUpstream($request, $connector, $arrOptions);
-        $requestUpstream->send();
-    }
-
-    /**
-     * @emit http.client.request
-     * @emit http.client.request.HOST:PORT
-     * @param RequestInterface $request
-     */
-    protected function handleRequest(RequestInterface $request)
-    {
-        $this->emit('http.client.request', [$request]);
-
-        // @todo emit only when have a listener, otherwise default to client.request emit
-        $this->emit('http.client.request.' . $request->getHost() . ':'. $request->getPort() , [$request]);
+        $this->emit('client.error', [$client]);
     }
 
     /**
@@ -150,20 +124,33 @@ class Server extends EventEmitter implements ServerInterface
      */
     protected function handleClose(ConnectionInterface $client)
     {
-        echo $client->getRemoteAddress() . " has closed \n";
-        $this->emit('http.client.close', [$client]);
+        $this->emit('client.close', [$client]);
         $this->clientsManager->remove($client);
     }
 
     /**
-     * @emit client.error
-     * @param ConnectionInterface $client
+     * @emit client.request:PORT
+     * @emit client.request.HOST:PORT
+     * @param RequestInterface $request
      */
-    protected function handleError(ConnectionInterface $client)
+    protected function handleRequest(RequestInterface $request)
     {
-        echo $client->getRemoteAddress() . " has ended \n";
+        $this->emit('client.request' . ':' . $request->getPort(), [$request]);
 
-        $this->emit('http.client.error', [$client]);
+        // @todo emit only when have a listener, otherwise default to client.request emit
+        $this->emit('client.request.' . $request->getHost() . ':' . $request->getPort(), [$request]);
+    }
+
+    /**
+     * @param PoolInterface $pool
+     * @param RequestInterface $request
+     * @param $arrOptions
+     */
+    public function proxy(PoolInterface $pool, RequestInterface $request, $arrOptions)
+    {
+        $connector = $this->upstreamManager->buildConnector();
+        $requestUpstream = new RequestUpstream($pool, $request, $connector, $arrOptions);
+        $requestUpstream->send();
     }
 
     /**

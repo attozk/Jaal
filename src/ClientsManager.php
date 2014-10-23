@@ -1,6 +1,6 @@
 <?php
 
-namespace Attozk\Roxy;
+namespace Attozk\Jaal;
 
 use React\Promise\Deferred;
 use React\Socket\ConnectionInterface;

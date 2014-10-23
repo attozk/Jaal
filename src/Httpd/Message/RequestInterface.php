@@ -1,12 +1,16 @@
 <?php
 
-namespace Attozk\Roxy\Http\Message;
+namespace Attozk\Jaal\Httpd\Message;
 
 use React\Socket\ConnectionInterface;
 Use Guzzle\Http\Message\RequestInterface as GuzzleRequestInterface;
 
 interface RequestInterface extends GuzzleRequestInterface
 {
+    public function setRequestId();
+
+    public function getRequestId();
+
     /**
      * Set the client used to transport the request
      *

@@ -1,6 +1,6 @@
 <?php
 
-namespace Attozk\Roxy\Http\Message;
+namespace Attozk\Jaal\Httpd\Message;
 
 Use Guzzle\Http\Message\Response as GuzzleResponse;
 

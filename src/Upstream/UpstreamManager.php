@@ -1,8 +1,8 @@
 <?php
 
-namespace Attozk\Roxy;
+namespace Attozk\Jaal\Upstream;
 
-use Attozk\Roxy\Http\Message\RequestInterface;
+use Attozk\Jaal\Httpd\Message\RequestInterface;
 use React\Promise\Deferred;
 use React\SocketClient\Connector;
 use React\SocketClient\ConnectorInterface;
