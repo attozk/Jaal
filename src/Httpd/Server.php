@@ -7,7 +7,8 @@ use Attozk\Jaal\Httpd\Message\RequestFactory;
 use Attozk\Jaal\Httpd\Message\RequestInterface;
 use Attozk\Jaal\Httpd\Message\RequestUpstream;
 use Attozk\Jaal\Httpd\Message\Response;
-use Attozk\Jaal\Upstream\PoolInterface;
+use Attozk\Jaal\Logger;
+use Attozk\Jaal\Upstream\PoolHttpd;
 use Attozk\Jaal\Upstream\UpstreamManager;
 use Evenement\EventEmitter;
 use React\EventLoop\LoopInterface;
@@ -78,6 +79,7 @@ class Server extends EventEmitter implements ServerInterface
     {
         $this->socket->on('connection', function (ConnectionInterface $client) {
 
+            Logger::getInstance()->debug($client->getRemoteAddress() . ' has connected.');
             $microtime = microtime();
             $this->clientsManager->isAllowed($client)->then(
                 function ($client) use ($microtime) {
@@ -126,6 +128,7 @@ class Server extends EventEmitter implements ServerInterface
     {
         $this->emit('client.close', [$client]);
         $this->clientsManager->remove($client);
+        Logger::getInstance()->debug($client->getRemoteAddress() . ' has closed.');
     }
 
     /**
@@ -139,17 +142,20 @@ class Server extends EventEmitter implements ServerInterface
 
         // @todo emit only when have a listener, otherwise default to client.request emit
         $this->emit('client.request.' . $request->getHost() . ':' . $request->getPort(), [$request]);
+
+        Logger::getInstance()->debug($request->getClientSocket()->getRemoteAddress() . ' has requested for ' . $request->getMethod() . ' ' . $request->getUrl());
     }
 
     /**
-     * @param PoolInterface $pool
+     * @param PoolHttpd $pool
      * @param RequestInterface $request
-     * @param $arrOptions
      */
-    public function proxy(PoolInterface $pool, RequestInterface $request, $arrOptions)
+    public function proxy(PoolHttpd $pool, RequestInterface $request)
     {
+        Logger::getInstance()->debug($request->getClientSocket()->getRemoteAddress() . ' ' . $request->getMethod() . ' ' . $request->getUrl() . ' >> UPSTREAM');
+
         $connector = $this->upstreamManager->buildConnector();
-        $requestUpstream = new RequestUpstream($pool, $request, $connector, $arrOptions);
+        $requestUpstream = new RequestUpstream($pool, $request, $connector);
         $requestUpstream->send();
     }
 

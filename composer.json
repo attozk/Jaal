@@ -21,7 +21,8 @@
         "ruflin/elastica" : "1.3.4.0",
         "symfony/yaml": "2.5.5",
         "dflydev/dot-access-configuration": "1.0.0",
-        "guzzle/guzzle": "3.9.*@dev"
+        "guzzle/guzzle": "3.9.*@dev",
+        "psr/log": "dev-master"
     },
     "autoload": {
         "psr-4": {

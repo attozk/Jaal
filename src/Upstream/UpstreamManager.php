@@ -20,6 +20,11 @@ class UpstreamManager
      */
     private $protocol;
 
+    /**
+     * Array of pools
+     */
+    public static $arrPools;
+
     public function __construct($loop, $dns, $protocol)
     {
         $this->loop = $loop;

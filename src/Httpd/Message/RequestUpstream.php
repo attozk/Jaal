@@ -2,7 +2,8 @@
 
 namespace Attozk\Jaal\Httpd\Message;
 
-use Attozk\Jaal\Upstream\PoolInterface;
+use Attozk\Jaal\Logger;
+use Attozk\Jaal\Upstream\PoolHttpd;
 use React\Promise\Deferred;
 use React\SocketClient\ConnectorInterface;
 use React\Stream\Stream;
@@ -24,64 +25,24 @@ class RequestUpstream extends Request implements RequestUpstreamInterface
     protected $upstreamStream;
 
     /**
-     * @param PoolInterface $pool
+     * @param PoolHttpd $pool
      * @param RequestInterface $request
      * @param ConnectorInterface $connector
-     * @param array $arrOptions
      */
-    public function __construct(PoolInterface $pool, RequestInterface $request, ConnectorInterface $connector, $arrOptions = array())
+    public function __construct(PoolHttpd $pool, RequestInterface $request, ConnectorInterface $connector)
     {
         $this->setStartTime();
         $this->pool = $pool;
         $this->setClientRequest($request);
         $this->upstreamSocket = $connector;
 
-        $arrRequestHeaders = $request->getHeaders();
-
-        // headers passed to proxy
-        $arrProxySetHeaders = isset($arrOptions['proxy_set_header']) && is_array($arrOptions['proxy_set_header']) ? $arrOptions['proxy_set_header'] : array();
-
-        // add headers to response (i..e sent to the client)
-        $arrAddHeaders = isset($arrOptions['add_header']) && is_array($arrOptions['add_header']) ? $arrOptions['add_header'] : array();
-
-        // headers not passed from proxy server to client
-        $arrProxyHideHeaders = isset($arrOptions['proxy_hide_header']) && is_array($arrOptions['proxy_hide_header']) ? $arrOptions['proxy_hide_header'] : array();
-
-
-        $arrInHeaders = array(
-            'Accept' => 1,
-            'Accept-Language' => 1,
-            'Accept-Charset' => 1,
-            'Accept-Encoding' => 1,
-            'Cache-Control' => 1,
-            'Cookie' => 1,
-            'Content-Length' => 1,
-            'Content-Type' => 1,
-            'Host' => 1,
-            'If-Match' => 1,
-            'If-Modified-Since' => 1,
-            'User-Agent' => 1
-        );
-
         parent::__construct($request->getMethod(), $request->getUrl());
 
-        if (isset($arrOptions['http_version'])) {
-            $this->setProtocolVersion($arrOptions['http_version']);
-        }
+        $this->pool->prepareUpstreamRequestHeaders($this);
 
-        // proxy_set_header
-        foreach($arrProxySetHeaders as $header => $value)
-        {
-            $this->setHeader($header, $value);
-        }
-
-        // copy headers from original request to upstream request
-        foreach($arrRequestHeaders as $header => $value)
-        {
-            $header = strtoupper($header);
-            if (isset($arrInHeaders[$header]) && !$this->hasHeader($header))
-                    $this->setHeader($header, $this->getHeader($header));
-        }
+        Logger::getInstance()->debug($this->getClientRequest()->getClientSocket()->getRemoteAddress() . ' ' .
+            $this->getClientRequest()->getMethod() . ' ' . $this->getClientRequest()->getUrl() . ' >> UPSTREAM >> ' .
+            $this->getUrl());
     }
 
     /**
@@ -138,15 +99,18 @@ class RequestUpstream extends Request implements RequestUpstreamInterface
         $promise = $deferred->promise();
 
         $this->upstreamSocket->create($arrServer['ip'], $arrServer['port'])->then(
-            function($stream) use($deferred) {
+            function($stream) use($deferred, $arrServer) {
 
+                Logger::getInstance()->debug('Upstream connected to ' . $arrServer['ip'] . ':' . $arrServer['port']);
                 $this->setUpstreamStream($stream);
                 $deferred->resolve($this);
             },
             // @TODO handle error
-            function() use($deferred)
+            function() use($deferred, $arrServer)
             {
                 $deferred->reject();
+
+                Logger::getInstance()->debug('Upstream connection error to ' . $arrServer['ip'] . ':' . $arrServer['port']);
             }
         );
 
@@ -160,28 +124,18 @@ class RequestUpstream extends Request implements RequestUpstreamInterface
      */
     public function send()
     {
-        $this->getClientRequest()->getClientSocket()->write('HTTP/1.1 200 OK
-Date: Thu, 23 Oct 2014 05:31:28 GMT
-Server: Apache/2.2.15 (CentOS)
-Last-Modified: Tue, 08 Jul 2014 02:21:52 GMT
-ETag: "202e6-7b-4fda54130f000"
-Accept-Ranges: bytes
-Content-Length: 0
-Vary: Accept-Encoding,User-Agent
-Content-Type: text/plain; charset=utf-8');
-
-        $this->getClientRequest()->getClientSocket()->end();
-        return;
         $this->connectUpstreamSocket()->then(
             function(RequestUpstreamInterface $request)
             {
+                Logger::getInstance()->debug('Writing to upstream...');
+
                 $stream = $request->getUpstreamStream();
                 $stream->write($this->getRawHeaders() . "\r\n\r\n");
 
-                /*echo "\n---------------------Header---------------------\n";
-                echo htmlspecialchars($this->getRawHeaders());
-                echo "\n---------------------/Header---------------------\n";
-                */
+                #echo "\n---------------------Header---------------------\n";
+                #echo htmlspecialchars($this->getRawHeaders());
+                #echo "\n---------------------/Header---------------------\n";
+
 
                 $consumed = 0;
                 $bodyLength = 0;
@@ -213,11 +167,12 @@ Content-Type: text/plain; charset=utf-8');
 
                     $consumed += strlen($data);
 
+                    /*
                     if ($compression) {
                         if ($compression == 'gzip') {
                             $data = gzdecode($data);
                         }
-                    }
+                    }*/
 
                     $bodyBuffer .= $data;
 
@@ -239,9 +194,9 @@ Content-Type: text/plain; charset=utf-8');
 
                         $request->getClientRequest()->getClientSocket()->end();
                         $stream->end();
-                        /*echo "--------------------CLIENT----------------------\n";
-                        echo $headers . $bodyBuffer;
-                        echo "\n--------------------/CLIENT----------------------\n";*/
+                        #echo "--------------------CLIENT----------------------\n";
+                        #echo $headers . $bodyBuffer;
+                        #echo "\n--------------------/CLIENT----------------------\n";
                     }
 
                     /*

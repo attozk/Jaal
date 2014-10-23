@@ -61,6 +61,7 @@ class Jaal
     {
         if ($this->config->get('httpd') && ($port = $this->config->get('httpd.port')) && ($ip = $this->config->get('httpd.listen')))
         {
+            Logger::getInstance()->debug('HTTP listening on ' . $ip .':' . $port);
             $socket = new SocketServer($this->loop);
             $this->httpd = new Httpd($this->loop, $socket, $this->dns);
             $this->httpd->listen($port, $ip);
@@ -77,9 +78,13 @@ class Jaal
         $recIterator = new \RecursiveIteratorIterator($directory);
         $regex = new \RegexIterator($recIterator, '/^.+\.php$/i');
 
+        $httpd = $this->getService('httpd');
         foreach($regex as $item) {
-            $httpd = $this->getService('httpd');
-            include($item->getPathname());
+
+            $filePath = $item->getPathname();
+            Logger::getInstance()->debug('Included conf.d >>> '. $filePath);
+
+            include($filePath);
         }
     }
 
