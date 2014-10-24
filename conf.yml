@@ -1,3 +1,11 @@
 httpd:
     port: 800
     listen: 0.0.0.0
+
+monitoring:
+    node: hello
+    peers:
+        - 192.168.1.1
+        - 187.76.1.2
+    port: 900
+    listen: 0.0.0.0

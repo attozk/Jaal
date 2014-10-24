@@ -1,6 +1,6 @@
 <?php
 
-namespace Attozk\Jaal\Upstream;
+namespace Hathoora\Jaal\Upstream;
 
 use Dflydev\DotAccessConfiguration\Configuration;
 

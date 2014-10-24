@@ -1,5 +1,5 @@
 {
-    "name": "attozk/jaal",
+    "name": "Hathoora/Jaal",
     "description": "PHP asynchronous network proxy",
     "version": "0.1.0",
     "keywords": ["elasticsearch", "async"],
@@ -22,11 +22,12 @@
         "symfony/yaml": "2.5.5",
         "dflydev/dot-access-configuration": "1.0.0",
         "guzzle/guzzle": "3.9.*@dev",
-        "psr/log": "dev-master"
+        "psr/log": "dev-master",
+        "cboden/ratchet": "0.4.*@dev"
     },
     "autoload": {
         "psr-4": {
-            "Attozk\\Jaal\\": "src"
+            "Hathoora\\Jaal\\": "src"
         }
     }
 }

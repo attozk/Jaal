@@ -1,6 +1,6 @@
 <?php
 
-namespace Attozk\Jaal;
+namespace Hathoora\Jaal;
 
 use React\Promise\Deferred;
 use React\Socket\ConnectionInterface;

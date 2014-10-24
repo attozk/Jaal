@@ -1,8 +1,13 @@
 <?php
 
-namespace Attozk\Jaal;
+namespace Hathoora\Jaal;
 
-use Attozk\Jaal\Httpd\Server as Httpd;
+use Hathoora\Jaal\Httpd\Server as Httpd;
+use Hathoora\Jaal\Monitoring\Monitoring;
+use Ratchet\Http\HttpServer;
+use Ratchet\Server\IoServer;
+use Ratchet\Wamp\WampServer;
+use Ratchet\WebSocket\WsServer;
 use React\Dns\Resolver\Resolver;
 use React\EventLoop\LoopInterface;
 use React\Socket\Server as SocketServer;
@@ -10,6 +15,11 @@ use Dflydev\DotAccessConfiguration\YamlFileConfigurationBuilder;
 
 class Jaal
 {
+    /**
+     * @var Jaal
+     */
+    protected static $instance;
+
     /**
      * @var \React\EventLoop\LoopInterface
      */
@@ -38,9 +48,16 @@ class Jaal
      */
     protected $config;
 
+    /** @var  \Hathoora\Jaal\Httpd\Server */
     protected $httpd;
 
-    public function __construct(LoopInterface $loop, Resolver $dns)
+    /** @var  \Hathoora\Jaal\Monitoring\Monitoring */
+    protected $monitoring;
+
+    private function __construct()
+    {}
+
+    public function setup(LoopInterface $loop, Resolver $dns)
     {
         $this->loop = $loop;
         $this->dns = $dns;
@@ -65,6 +82,24 @@ class Jaal
             $socket = new SocketServer($this->loop);
             $this->httpd = new Httpd($this->loop, $socket, $this->dns);
             $this->httpd->listen($port, $ip);
+        }
+
+        if ($this->config->get('monitoring') && ($port = $this->config->get('monitoring.port')) && ($ip = $this->config->get('monitoring.listen'))) {
+
+            $this->monitoring = new Monitoring($this->loop);
+
+            $socket = new SocketServer($this->loop);
+            $socket->listen($port, $ip);
+            new IoServer(
+                new HttpServer(
+                    new WsServer(
+                        new WampServer(
+                            $this->monitoring
+                        )
+                    )
+                ),
+                $socket
+            );
         }
     }
 
@@ -101,6 +136,15 @@ class Jaal
         }
 
         return $service;
+    }
+
+    public static function getInstance()
+    {
+        if (!isset(static::$instance)) {
+            static::$instance = new self;
+        }
+
+        return static::$instance;
     }
 
 }

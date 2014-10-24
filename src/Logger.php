@@ -1,6 +1,6 @@
 <?php
 
-namespace Attozk\Jaal;
+namespace Hathoora\Jaal;
 
 use Psr\Log\LoggerInterface;
 
@@ -119,7 +119,7 @@ class Logger implements LoggerInterface
      */
     public function debug($message, array $context = array())
     {
-        echo $message . "\n";
+        //echo $message . "\n";
     }
 
     /**

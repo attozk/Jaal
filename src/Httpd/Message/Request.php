@@ -1,6 +1,6 @@
 <?php
 
-namespace Attozk\Jaal\Httpd\Message;
+namespace Hathoora\Jaal\Httpd\Message;
 
 use Guzzle\Http\Message\Request as GuzzleRequest;
 Use React\Socket\ConnectionInterface;

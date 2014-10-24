@@ -7,6 +7,7 @@ $loop = React\EventLoop\Factory::create();
 $dnsResolverFactory = new React\Dns\Resolver\Factory();
 $dns = $dnsResolverFactory->createCached('8.8.8.8', $loop);
 
-$jaal = new \Attozk\Jaal\Jaal($loop, $dns);
+$jaal = \Hathoora\Jaal\Jaal::getInstance();
+$jaal->setup($loop, $dns);
 
 $loop->run();

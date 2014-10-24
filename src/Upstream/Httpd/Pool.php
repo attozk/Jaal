@@ -1,14 +1,19 @@
 <?php
 
-namespace Attozk\Jaal\Upstream;
+namespace Hathoora\Jaal\Upstream\Httpd;
 
-use Attozk\Jaal\Httpd\Message\RequestInterface;
-use Attozk\Jaal\Httpd\Message\RequestUpstreamHeaders;
-use Attozk\Jaal\Httpd\Message\RequestUpstreamInterface;
-use Attozk\Jaal\Logger;
+use Guzzle\Http\Message\AbstractMessage;
+use Hathoora\Jaal\Httpd\Message\RequestInterface;
+use Hathoora\Jaal\Httpd\Message\RequestUpstream;
+use Hathoora\Jaal\Httpd\Message\RequestUpstreamHeaders;
+use Hathoora\Jaal\Httpd\Message\RequestUpstreamInterface;
+use Hathoora\Jaal\Logger;
 use Dflydev\DotAccessConfiguration\Configuration;
+use React\SocketClient\ConnectorInterface;
+use Hathoora\Jaal\Upstream\UpstreamManager;
+Use Hathoora\Jaal\Upstream\Pool as PoolBase;
 
-class PoolHttpd extends Pool
+class Pool extends PoolBase
 {
     /**
      * // nginx inspired @http://nginx.org/en/docs/http/ngx_http_upstream_module.html#health_check
@@ -27,8 +32,17 @@ class PoolHttpd extends Pool
      * )
      * )*/
 
-    public function __construct($arrConfig)
+    /**
+     * Array of \React\SocketClient\ConnectorInterface
+     */
+    private $upstreamConnectors = array();
+
+    /** @var  \Hathoora\Jaal\Upstream\UpstreamManager */
+    private $upstreamManager;
+
+    public function __construct(UpstreamManager $upstreamManager, $arrConfig)
     {
+        $this->upstreamManager = $upstreamManager;
         $this->init($arrConfig);
     }
 
@@ -36,12 +50,18 @@ class PoolHttpd extends Pool
     {
         // additional headers passed to proxy (in addition to client's headers)
         $arrProxySetHeaders = isset($arrConfig['proxy_set_header']) && is_array($arrConfig['proxy_set_header']) ? $arrConfig['proxy_set_header'] : array();
+        $arrProxySetHeaders['Connection'] = '';
 
         // add headers to response (i..e sent to the client)
         $arrAddHeaders = isset($arrConfig['add_header']) && is_array($arrConfig['add_header']) ? $arrConfig['add_header'] : array();
 
         // headers not passed from proxy server to client
         $arrProxyHideHeaders = isset($arrConfig['proxy_hide_header']) && is_array($arrConfig['proxy_hide_header']) ? $arrConfig['proxy_hide_header'] : array();
+
+        // keep alive?
+        if (isset($arrConfig['upstreams']) && !empty($arrConfig['upstreams']['keepalive'])) {
+            $arrProxySetHeaders['Connection'] = 'Keep-Alive';
+        }
 
         // the end product of all header's merging
         $arrRequestHeaders = $arrProxySetHeaders;
@@ -56,7 +76,7 @@ class PoolHttpd extends Pool
     /**
      * @param RequestUpstreamInterface $request
      */
-    public function prepareUpstreamRequestHeaders(RequestUpstreamInterface &$request)
+    public function prepareClientToProxyRequestHeaders(RequestUpstreamInterface &$request)
     {
         if ($version = $request->pool->config->get('http_version')) {
             $request->setProtocolVersion($version);
@@ -82,6 +102,18 @@ class PoolHttpd extends Pool
     }
 
     /**
+     * @param RequestUpstream $request
+     * @param AbstractMessage $response
+     */
+    public function prepareProxyToClientHeaders(RequestUpstream &$request, AbstractMessage &$response)
+    {
+        $arrProxyResponseHideHeaders = $request->pool->config->get('proxy_hide_header');
+        foreach ($arrProxyResponseHideHeaders as $header) {
+            $response->removeHeader($header);
+        }
+    }
+
+    /**
      * @param RequestInterface $request
      * @return mixed
      */
@@ -94,21 +126,31 @@ class PoolHttpd extends Pool
 
     /**
      * @param RequestInterface $request
-     * @param $arrConfig
-     * @return static
+     * @return mixed
      */
-    public static function factory(RequestInterface $request, $arrConfig)
+    public function getUpstreamSocket(RequestInterface $request)
     {
-        $pool = null;
+        $deferred = new Deferred();
+        $arrServer = $this->getServer($this->clientRequest);
+        $promise = $deferred->promise();
 
-        $uniqueName = 'httpd.' . $request->getScheme() . ':' . $request->getHost() . ':' . $request->getPort();
-        if (!isset(UpstreamManager::$arrPools[$uniqueName])) {
-            $pool = new static($arrConfig);
-            UpstreamManager::$arrPools[$uniqueName] = $pool;
-        } else {
-            $pool = UpstreamManager::$arrPools[$uniqueName];
-        }
 
-        return $pool;
+
+        $this->upstreamSocket->create($arrServer['ip'], $arrServer['port'])->then(
+            function ($stream) use ($deferred, $arrServer) {
+
+                Logger::getInstance()->debug('Upstream connected to ' . $arrServer['ip'] . ':' . $arrServer['port']);
+                $this->setUpstreamStream($stream);
+                $deferred->resolve($this);
+            },
+            // @TODO handle error
+            function () use ($deferred, $arrServer) {
+                $deferred->reject();
+
+                Logger::getInstance()->debug('Upstream connection error to ' . $arrServer['ip'] . ':' . $arrServer['port']);
+            }
+        );
+
+        return $promise;
     }
 }

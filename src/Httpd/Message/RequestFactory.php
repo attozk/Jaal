@@ -1,11 +1,11 @@
 <?php
 
-namespace Attozk\Jaal\Httpd\Message;
+namespace Hathoora\Jaal\Httpd\Message;
 
 use Guzzle\Http\Message\RequestFactory as GuzzleRequestFactory;
 
 class RequestFactory extends GuzzleRequestFactory
 {
     /** @var string Class to instantiate for requests with no body */
-    protected $requestClass = 'Attozk\\Jaal\\Httpd\\Message\\Request';
+    protected $requestClass = 'Hathoora\\Jaal\\Httpd\\Message\\Request';
 }

@@ -1,15 +1,15 @@
 <?php
 
-namespace Attozk\Jaal\Httpd;
+namespace Hathoora\Jaal\Httpd;
 
-use Attozk\Jaal\ClientsManager;
-use Attozk\Jaal\Httpd\Message\RequestFactory;
-use Attozk\Jaal\Httpd\Message\RequestInterface;
-use Attozk\Jaal\Httpd\Message\RequestUpstream;
-use Attozk\Jaal\Httpd\Message\Response;
-use Attozk\Jaal\Logger;
-use Attozk\Jaal\Upstream\PoolHttpd;
-use Attozk\Jaal\Upstream\UpstreamManager;
+use Hathoora\Jaal\ClientsManager;
+use Hathoora\Jaal\Httpd\Message\RequestFactory;
+use Hathoora\Jaal\Httpd\Message\RequestInterface;
+use Hathoora\Jaal\Httpd\Message\RequestUpstream;
+use Hathoora\Jaal\Httpd\Message\Response;
+use Hathoora\Jaal\Logger;
+use Hathoora\Jaal\Upstream\Httpd\Pool;
+use Hathoora\Jaal\Upstream\UpstreamManager;
 use Evenement\EventEmitter;
 use React\EventLoop\LoopInterface;
 use React\Socket\ConnectionInterface;
@@ -37,12 +37,12 @@ class Server extends EventEmitter implements ServerInterface
     /**
      * @var ClientsManager
      */
-    protected $clientsManager;
+    public $clientsManager;
 
     /**
-     * @var UpstreamManager;
+     * @var \Hathoora\Jaal\Upstream\UpstreamManager
      */
-    protected $upstreamManager;
+    public $upstreamManager;
 
     private $arrConfig = array(
         'maxConnectionsPerIP' => 10,             // maximum concurrent connections per IP
@@ -94,7 +94,7 @@ class Server extends EventEmitter implements ServerInterface
 
                     $client->on('data', function ($data) use ($client, $microtime) {
 
-                        /** @var $request \Attozk\Jaal\Httpd\Message\Request */
+                        /** @var $request \Hathoora\Jaal\Httpd\Message\Request */
                         $request = RequestFactory::getInstance()->fromMessage($data);
                         $request->setClientSocket($client);
 
@@ -147,15 +147,15 @@ class Server extends EventEmitter implements ServerInterface
     }
 
     /**
-     * @param PoolHttpd $pool
+     * @param Pool $pool
      * @param RequestInterface $request
      */
-    public function proxy(PoolHttpd $pool, RequestInterface $request)
+    public function proxy(Pool $pool, RequestInterface $request)
     {
         Logger::getInstance()->debug($request->getClientSocket()->getRemoteAddress() . ' ' . $request->getMethod() . ' ' . $request->getUrl() . ' >> UPSTREAM');
 
         $connector = $this->upstreamManager->buildConnector();
-        $requestUpstream = new RequestUpstream($pool, $request, $connector);
+        $requestUpstream = new RequestUpstream($pool, $request);
         $requestUpstream->send();
     }
 

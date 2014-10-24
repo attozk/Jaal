@@ -1,6 +1,6 @@
 <?php
 
-namespace Attozk\Jaal\Httpd;
+namespace Hathoora\Jaal\Httpd;
 
 interface ServerInterface
 {

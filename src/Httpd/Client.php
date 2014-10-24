@@ -1,6 +1,6 @@
 <?php
 
-namespace Attozk\Jaal\Httpdd;
+namespace Hathoora\Jaal\Httpdd;
 
 class Client
 {

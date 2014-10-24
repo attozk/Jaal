@@ -1,8 +1,8 @@
 <?php
 
-namespace Attozk\Jaal\Upstream;
+namespace Hathoora\Jaal\Upstream;
 
-use Attozk\Jaal\Httpd\Message\RequestInterface;
+use Hathoora\Jaal\Httpd\Message\RequestInterface;
 use React\Promise\Deferred;
 use React\SocketClient\Connector;
 use React\SocketClient\ConnectorInterface;

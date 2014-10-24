@@ -1,6 +1,6 @@
 <?php
 
-namespace Attozk\Jaal\Httpd\Message;
+namespace Hathoora\Jaal\Httpd\Message;
 
 class RequestUpstreamHeaders
 {
