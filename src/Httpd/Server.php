@@ -11,6 +11,7 @@ use Hathoora\Jaal\Logger;
 use Hathoora\Jaal\Upstream\Httpd\Pool;
 use Hathoora\Jaal\Upstream\UpstreamManager;
 use Evenement\EventEmitter;
+use Hathoora\Jaal\Util\Time;
 use React\EventLoop\LoopInterface;
 use React\Socket\ConnectionInterface;
 use React\Socket\Server as TCPServer;
@@ -78,11 +79,9 @@ class Server extends EventEmitter implements ServerInterface
     private function init()
     {
         $this->socket->on('connection', function (ConnectionInterface $client) {
-
             Logger::getInstance()->debug($client->getRemoteAddress() . ' has connected.');
-            $microtime = microtime();
             $this->clientsManager->isAllowed($client)->then(
-                function ($client) use ($microtime) {
+                function ($client)  {
 
                     $client->on('close', function (ConnectionInterface $client) {
                         $this->handleClose($client);
@@ -92,13 +91,8 @@ class Server extends EventEmitter implements ServerInterface
                         $this->handleError($client);
                     });
 
-                    $client->on('data', function ($data) use ($client, $microtime) {
-
-                        /** @var $request \Hathoora\Jaal\Httpd\Message\Request */
-                        $request = RequestFactory::getInstance()->fromMessage($data);
-                        $request->setClientSocket($client);
-
-                        $this->handleRequest($request);
+                    $client->on('data', function ($data) use ($client) {
+                        $this->handleData($data, $client);
                     });
 
                 },
@@ -112,23 +106,16 @@ class Server extends EventEmitter implements ServerInterface
     }
 
     /**
-     * @emit client.error
+     * @param $data
      * @param ConnectionInterface $client
      */
-    protected function handleError(ConnectionInterface $client)
+    protected function handleData($data,  ConnectionInterface $client)
     {
-        $this->emit('client.error', [$client]);
-    }
+        /** @var $request \Hathoora\Jaal\Httpd\Message\Request */
+        $request = RequestFactory::getInstance()->fromMessage($data);
+        $request->setClientSocket($client);
 
-    /**
-     * @emit client.close
-     * @param ConnectionInterface $client
-     */
-    protected function handleClose(ConnectionInterface $client)
-    {
-        $this->emit('client.close', [$client]);
-        $this->clientsManager->remove($client);
-        Logger::getInstance()->debug($client->getRemoteAddress() . ' has closed.');
+        $this->handleRequest($request);
     }
 
     /**
@@ -147,6 +134,28 @@ class Server extends EventEmitter implements ServerInterface
     }
 
     /**
+     * @emit client.error
+     * @param ConnectionInterface $client
+     */
+    protected function handleError(ConnectionInterface $client)
+    {
+        $this->emit('client.error', [$client]);
+    }
+
+    /**
+     * @emit client.close
+     * @param ConnectionInterface $client
+     */
+    protected function handleClose(ConnectionInterface $client)
+    {
+        Logger::getInstance()->debug($client->getRemoteAddress() . ' has closed.');
+
+        $this->emit('client.close', [$client]);
+        $this->clientsManager->remove($client);
+
+    }
+
+    /**
      * @param Pool $pool
      * @param RequestInterface $request
      */
@@ -154,7 +163,6 @@ class Server extends EventEmitter implements ServerInterface
     {
         Logger::getInstance()->debug($request->getClientSocket()->getRemoteAddress() . ' ' . $request->getMethod() . ' ' . $request->getUrl() . ' >> UPSTREAM');
 
-        $connector = $this->upstreamManager->buildConnector();
         $requestUpstream = new RequestUpstream($pool, $request);
         $requestUpstream->send();
     }

@@ -9,9 +9,11 @@ use Hathoora\Jaal\Httpd\Message\RequestUpstreamHeaders;
 use Hathoora\Jaal\Httpd\Message\RequestUpstreamInterface;
 use Hathoora\Jaal\Logger;
 use Dflydev\DotAccessConfiguration\Configuration;
+use React\Promise\Deferred;
 use React\SocketClient\ConnectorInterface;
 use Hathoora\Jaal\Upstream\UpstreamManager;
 Use Hathoora\Jaal\Upstream\Pool as PoolBase;
+use React\Stream\Stream;
 
 class Pool extends PoolBase
 {
@@ -57,6 +59,9 @@ class Pool extends PoolBase
 
         // headers not passed from proxy server to client
         $arrProxyHideHeaders = isset($arrConfig['proxy_hide_header']) && is_array($arrConfig['proxy_hide_header']) ? $arrConfig['proxy_hide_header'] : array();
+        foreach ($arrProxyHideHeaders as $header) {
+            $arrAddHeaders[$header] = false;
+        }
 
         // keep alive?
         if (isset($arrConfig['upstreams']) && !empty($arrConfig['upstreams']['keepalive'])) {
@@ -67,90 +72,92 @@ class Pool extends PoolBase
         $arrRequestHeaders = $arrProxySetHeaders;
         $arrResponseHeaders = $arrAddHeaders;
 
-        $arrConfig['headers']['proxy_request'] = $arrRequestHeaders;
-        $arrConfig['headers']['proxy_response'] = $arrResponseHeaders;
+        $arrConfig['headers']['server_to_upstream_request'] = $arrRequestHeaders;
+        $arrConfig['headers']['upstream_to_client_response'] = $arrResponseHeaders;
 
         $this->config = new Configuration($arrConfig);
     }
 
     /**
-     * @param RequestUpstreamInterface $request
-     */
-    public function prepareClientToProxyRequestHeaders(RequestUpstreamInterface &$request)
-    {
-        if ($version = $request->pool->config->get('http_version')) {
-            $request->setProtocolVersion($version);
-        }
-
-        // setting new proxy request headers
-        $arrProxyRequestHeaders = $request->pool->config->get('headers.proxy_request');
-        foreach ($arrProxyRequestHeaders as $header => $value) {
-            Logger::getInstance()->debug('Setting proxy_set_header headers: ' . $header . ' => ' . $value);
-            $request->setHeader($header, $value);
-        }
-
-        // copy headers from original request to upstream request
-        $arrClientHeaders = $request->getClientRequest()->getHeaders();
-        foreach ($arrClientHeaders as $header => $value) {
-            $header = strtolower($header);
-
-            if (isset(RequestUpstreamHeaders::$arrClientToProxyRequestHeaders[$header]) && !$request->hasHeader($header)) {
-                $request->setHeader($header, $value);
-                Logger::getInstance()->debug('Setting client_to_proxy headers: ' . $header . ' => ' . $value);
-            }
-        }
-    }
-
-    /**
-     * @param RequestUpstream $request
-     * @param AbstractMessage $response
-     */
-    public function prepareProxyToClientHeaders(RequestUpstream &$request, AbstractMessage &$response)
-    {
-        $arrProxyResponseHideHeaders = $request->pool->config->get('proxy_hide_header');
-        foreach ($arrProxyResponseHideHeaders as $header) {
-            $response->removeHeader($header);
-        }
-    }
-
-    /**
-     * @param RequestInterface $request
+     * Return a server based on load/health etc..
      * @return mixed
      */
-    public function getServer(RequestInterface $request)
+    public function getServer()
     {
         $arrUpstreams = $this->config->get('upstreams');
 
         return array_pop($arrUpstreams['servers']);
     }
 
-    /**
-     * @param RequestInterface $request
-     * @return mixed
-     */
-    public function getUpstreamSocket(RequestInterface $request)
+    public function upstreamSocketFactory($arrServer, RequestUpstream $requestUpstream)
     {
+        $ip = $arrServer['ip'];
+        $port = $arrServer['port'];
+        $failTimeout = $arrServer['fail_timeout'];
+        $MaxFails = $arrServer['max_fails'];
+
+        $key = $ip . ':' . $port;
+        $connector = null;
         $deferred = new Deferred();
-        $arrServer = $this->getServer($this->clientRequest);
         $promise = $deferred->promise();
 
+        if (isset($this->upstreamConnectors[$key])) {
 
-
-        $this->upstreamSocket->create($arrServer['ip'], $arrServer['port'])->then(
-            function ($stream) use ($deferred, $arrServer) {
-
-                Logger::getInstance()->debug('Upstream connected to ' . $arrServer['ip'] . ':' . $arrServer['port']);
-                $this->setUpstreamStream($stream);
-                $deferred->resolve($this);
-            },
-            // @TODO handle error
-            function () use ($deferred, $arrServer) {
-                $deferred->reject();
-
-                Logger::getInstance()->debug('Upstream connection error to ' . $arrServer['ip'] . ':' . $arrServer['port']);
+            // stream is connected?
+            if ($this->upstreamConnectors[$key]['status'] == 'connected') {
+                $deferred->resolve($this->upstreamConnectors[$key]['stream']);
             }
-        );
+        }
+
+        // reuse existing stream...
+        if (!isset($this->upstreamConnectors[$key]) || (isset($this->upstreamConnectors[$key]) && $this->upstreamConnectors[$key]['status'] != 'connected')) {
+
+            $connector = $this->upstreamManager->buildConnector();
+
+            if (!isset($this->upstreamConnectors[$key])) {
+
+                $this->upstreamConnectors[$key] = array(
+                    'connector' => $connector,
+                    'start' => null,
+                    'status' => 'pending',
+                    'connectCount' => 0
+                );
+            }
+
+            // @TODO keep track of timeout and implement fail_timeout
+            $connector->create($ip, $port)->then(function (Stream $stream) use ($deferred, $key, $requestUpstream) {
+                    $this->upstreamConnectors[$key]['start'] = time();
+                    $this->upstreamConnectors[$key]['stream'] = $stream;
+                    $this->upstreamConnectors[$key]['status'] = 'connected';
+                    $this->upstreamConnectors[$key]['connectCount']++;
+
+                    Logger::getInstance()->debug('Upstream connected for ' . $key);
+
+                    $stream->on('close', function () use ($key) {
+                        Logger::getInstance()->debug('Upstream closed for ' . $key);
+                        $this->upstreamConnectors[$key]['status'] = 'disconnected';
+                    });
+
+                    $deferred->resolve($stream);
+                },
+                function ($error) use ($deferred, $key, $requestUpstream) {
+                    Logger::getInstance()->debug('Upstream closed for ' . $key);
+                    $this->upstreamConnectors[$key]['status'] = 'error';
+
+                    // close client?
+                    //$requestUpstream->getClientRequest()->send();
+
+                    $deferred->reject();
+                });
+        }
 
         return $promise;
+    }
+
+    public function getUpstreamSocket(RequestUpstream $requestUpstream)
+    {
+        $arrServer = $this->getServer();
+
+        return $this->upstreamSocketFactory($arrServer, $requestUpstream);
     }
 }

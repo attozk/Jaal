@@ -2,10 +2,7 @@
 
 namespace Hathoora\Jaal\Httpd\Message;
 
-use React\Socket\ConnectionInterface;
 Use Guzzle\Http\Message\RequestInterface as GuzzleRequestInterface;
-use React\SocketClient\ConnectorInterface;
-use React\Stream\Stream;
 
 interface RequestUpstreamInterface extends GuzzleRequestInterface
 {
@@ -16,4 +13,8 @@ interface RequestUpstreamInterface extends GuzzleRequestInterface
     public function setClientRequest(Request $request);
 
     public function getClientRequest();
+
+    public function setUpstreamResponse(ResponseUpstream $response);
+
+    public function getUpstreamResponse();
 }

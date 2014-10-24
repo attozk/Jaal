@@ -23,7 +23,7 @@ class UpstreamManager
     /**
      * Array of pools
      */
-    public static $arrPools;
+    public $arrPools;
 
     public function __construct($loop, $dns, $protocol)
     {

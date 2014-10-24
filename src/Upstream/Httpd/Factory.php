@@ -20,15 +20,14 @@ class Factory
         /** @var $upstream \Hathoora\Jaal\Upstream\UpstreamManager */
         $upstream = $httpd->upstreamManager;
 
-        $uniqueName = 'httpd.' . $request->getScheme() . ':' . $request->getHost() . ':' . $request->getPort();
+        $uniqueName = $request->getScheme() . ':' . $request->getHost() . ':' . $request->getPort();
 
-        if (!isset($upstream::$arrPools[$uniqueName])) {
+        if (!isset($upstream->arrPools[$uniqueName])) {
             $pool = new Pool($httpd->upstreamManager, $arrConfig);
-            $upstream::$arrPools[$uniqueName] = $pool;
+            $upstream->arrPools[$uniqueName] = $pool;
         } else {
-            $pool = $upstream::$arrPools[$uniqueName];
+            $pool = $upstream->arrPools[$uniqueName];
         }
-
 
         $httpd->proxy($pool, $request);
     }

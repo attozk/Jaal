@@ -3,16 +3,23 @@
 namespace Hathoora\Jaal\Httpd\Message;
 
 use Guzzle\Http\Message\Request as GuzzleRequest;
+use Hathoora\Jaal\Util\Time;
 Use React\Socket\ConnectionInterface;
 
 class Request extends GuzzleRequest implements RequestInterface
 {
-    private $jStartMTime;         // request start micro time
+    private $jStartMTime;         // request start millitime
     private $jExecTime;           // request execution time im milliseconds
     private $jUniqueId;           // unique id for request
 
     /** @var \React\Socket\ConnectionInterface */
     protected $clientSocket;
+
+    /**
+     * The response which we send back to the client
+     * @var Response
+     */
+    private $responseJaal;
 
     /**
      * @param string $method
@@ -24,7 +31,6 @@ class Request extends GuzzleRequest implements RequestInterface
         parent::__construct($method, $url, $headers);
         $this->setStartTime();
         $this->setRequestId();
-        $this->getRequestId();
     }
 
     public function setRequestId()
@@ -49,12 +55,21 @@ class Request extends GuzzleRequest implements RequestInterface
         return $this->clientSocket;
     }
 
+    public function setJaalResponse(Response $response)
+    {
+        $this->responseJaal = $response;
+    }
+
+    public function getJaalResponse() {
+        return $this->responseJaal;
+    }
+
     public function setStartTime($microtime = null)
     {
         if (!$microtime)
             $microtime = microtime();
 
-        $this->jStartMTime = $microtime;
+        $this->jStartMTime = Time::millitime($microtime);
 
         return $this;
     }
@@ -62,9 +77,8 @@ class Request extends GuzzleRequest implements RequestInterface
     public function setExecutionTime()
     {
         if (!$this->jExecTime) {
-            list($a_dec, $a_sec) = explode(" ", $this->jStartMTime);
-            list($b_dec, $b_sec) = explode(" ", microtime());
-                $this->jExecTime = ($b_sec - $a_sec + $b_dec - $a_dec);
+            $end = Time::millitime(microtime());
+            $this->jExecTime = ($end - $this->jStartMTime);
         }
 
         return $this;
@@ -73,5 +87,12 @@ class Request extends GuzzleRequest implements RequestInterface
     public function getExecutionTime()
     {
         return $this->jExecTime;
+    }
+
+
+    public function send()
+    {
+        $this->getClientSocket()->write($this->responseJaal->getRawHeaders() . $this->responseJaal->getBody());
+        $this->getClientSocket()->end();
     }
 }

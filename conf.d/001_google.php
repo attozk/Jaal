@@ -11,7 +11,7 @@ $httpd->on('client.request:800', function (\Hathoora\Jaal\Httpd\Message\Request 
         ),
         'add_header' => array(),
         'proxy_set_header' => array(
-            'HOST' => 'mine.pk'
+            'HOST' => 'HOST'
         ),
         'upstreams' => array(
             // nginx inspired @http://nginx.org/en/docs/http/ngx_http_upstream_module.html#health_check

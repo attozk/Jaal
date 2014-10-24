@@ -26,6 +26,10 @@ interface RequestInterface extends GuzzleRequestInterface
      */
     public function getClientSocket();
 
+    public function setJaalResponse(Response $response);
+
+    public function getJaalResponse();
+
     /**
      * Sets microtime
      *
