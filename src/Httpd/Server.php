@@ -3,6 +3,7 @@
 namespace Hathoora\Jaal\Httpd;
 
 use Hathoora\Jaal\ClientsManager;
+use Hathoora\Jaal\Httpd\Message\Parser\Parser;
 use Hathoora\Jaal\Httpd\Message\RequestFactory;
 use Hathoora\Jaal\Httpd\Message\RequestInterface;
 use Hathoora\Jaal\Httpd\Message\RequestUpstream;
@@ -112,6 +113,8 @@ class Server extends EventEmitter implements ServerInterface
     protected function handleData($data,  ConnectionInterface $client)
     {
         /** @var $request \Hathoora\Jaal\Httpd\Message\Request */
+        //Parser::parseRequest($data);
+
         $request = RequestFactory::getInstance()->fromMessage($data);
         $request->setClientSocket($client);
 
