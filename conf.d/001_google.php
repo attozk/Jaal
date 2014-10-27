@@ -1,8 +1,8 @@
 <?php
 
-$http->on('client.request:800', function (\Hathoora\Jaal\Daemons\Http\Message\Request $request) use ($http) {
+$httpd->on('client.request:800', function ($request) use ($httpd) {
 
-     \Hathoora\Jaal\Upstream\Http\Factory::create($request, $arrOptions = array(
+    $arrVhostConfig = array(
         // nginx inspred
         'http_version' => '1.1',
         'proxy_hide_header' => array(
@@ -29,5 +29,8 @@ $http->on('client.request:800', function (\Hathoora\Jaal\Daemons\Http\Message\Re
                 )
             )
         )
-    ));
+    );
+
+    $httpd->proxy($arrVhostConfig, $request);
+
 });

@@ -15,7 +15,7 @@ class Factory
     public static function create(RequestInterface $request, $arrConfig)
     {
         /** @var $Http \Hathoora\Jaal\Daemons\Http\Server */
-        $Http = Jaal::getInstance()->getService('Http');
+        $Http = Jaal::getInstance()->getDaemon('Http');
 
         /** @var $upstream \Hathoora\Jaal\Upstream\UpstreamManager */
         $upstream = $Http->upstreamManager;

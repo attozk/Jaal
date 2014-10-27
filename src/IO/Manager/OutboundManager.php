@@ -11,7 +11,7 @@ use React\SocketClient\ConnectorInterface;
  *
  * @package Hathoora\Jaal\IO\Manager
  */
-class Outbound
+class OutboundManager
 {
     /**
      * @var \React\EventLoop\LoopInterface

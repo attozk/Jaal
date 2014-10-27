@@ -2,7 +2,10 @@
 
 namespace Hathoora\Jaal\Daemons\Http;
 
-use Hathoora\Jaal\ClientsManager;
+use Hathoora\Jaal\Daemons\Http\Vhost\Factory;
+Use Hathoora\Jaal\IO\Manager\InboundManager;
+use Hathoora\Jaal\IO\Manager\OutboundManager;
+Use Hathoora\Jaal\IO\Manager\outoundManager;
 use Hathoora\Jaal\IO\React\Socket\ConnectionInterface;
 use Hathoora\Jaal\IO\React\Socket\Server as SocketServer;
 use Hathoora\Jaal\Daemons\Http\Message\Parser\Parser;
@@ -35,14 +38,14 @@ class Httpd extends EventEmitter implements HttpdInterface
     protected $dns;
 
     /**
-     * @var ClientsManager
+     * @var InboundManager
      */
-    public $clientsManager;
+    public $inboundIOManager;
 
     /**
-     * @var \Hathoora\Jaal\Upstream\UpstreamManager
+     * @var OutboundManager
      */
-    public $upstreamManager;
+    public $outboundIOManager;
 
     private $arrConfig = array(
         'maxConnectionsPerIP' => 10,             // maximum concurrent connections per IP
@@ -58,8 +61,8 @@ class Httpd extends EventEmitter implements HttpdInterface
         $this->loop = $loop;
         $this->socket = $socket;
         $this->dns = $dns;
-        $this->clientsManager = new ClientsManager($this->loop, 'http');
-        $this->upstreamManager = new UpstreamManager($this->loop, $dns, 'http');
+        $this->inboundIOManager = new InboundManager($this->loop, 'http');
+        $this->outboundIOManager = new OutboundManager($this->loop, $dns, 'http');
         $this->listen();
         $this->init();
     }
@@ -78,7 +81,7 @@ class Httpd extends EventEmitter implements HttpdInterface
     private function init()
     {
         $this->socket->on('connection', function (ConnectionInterface $client) {
-            $this->clientsManager->add($client);
+            $this->inboundIOManager->add($client);
 
             $client->isAllowed($client)->then(
                 function ($client) {
@@ -97,7 +100,7 @@ class Httpd extends EventEmitter implements HttpdInterface
                 },
                 // @TODO error handle, emit somthing here?
                 function ($error) use ($client) {
-                    $this->clientsManager->end($client);
+                    $this->inboundIOManager->end($client);
                 }
             );
         });
@@ -147,17 +150,17 @@ class Httpd extends EventEmitter implements HttpdInterface
     protected function handleClose(ConnectionInterface $client)
     {
         $this->emit('client.close', [$client]);
-        $this->clientsManager->end($client);
+        $this->inboundIOManager->end($client);
     }
 
     /**
-     * @param Pool $pool
+     * @param array $arrVhostConfig
      * @param RequestInterface $request
      */
-    public function proxy(Pool $pool, RequestInterface $request)
+    public function proxy($arrVhostConfig, RequestInterface $request)
     {
-        $requestUpstream = new RequestUpstream($pool, $request);
-        $requestUpstream->send();
+        $vhost = new Factory($arrVhostConfig, $request->getScheme(), $request->getHost(), $request->getPort());
+        (new RequestUpstream($vhost, $request))->send();
     }
 
     /**
@@ -165,6 +168,6 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     public function stats()
     {
-        print_r($this->clientsManager->count());
+        print_r($this->inboundIOManager->count());
     }
 }

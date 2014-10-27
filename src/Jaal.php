@@ -50,7 +50,7 @@ class Jaal
     protected $config;
 
     /** @var  \Hathoora\Jaal\Daemons\Http\Server */
-    protected $http;
+    protected $httpd;
 
     /** @var  \Hathoora\Jaal\Monitoring\Monitoring */
     protected $monitoring;
@@ -77,12 +77,12 @@ class Jaal
 
     public function initServices()
     {
-        if ($this->config->get('Http') && ($port = $this->config->get('Http.port')) && ($ip = $this->config->get('Http.listen')))
+        if ($this->config->get('httpd') && ($port = $this->config->get('httpd.port')) && ($ip = $this->config->get('httpd.listen')))
         {
             Logger::getInstance()->debug('HTTP listening on ' . $ip .':' . $port);
             $socket = new SocketServer($this->loop);
-            $this->http = new Httpd($this->loop, $socket, $this->dns);
-            $this->http->listen($port, $ip);
+            $this->httpd = new Httpd($this->loop, $socket, $this->dns);
+            $this->httpd->listen($port, $ip);
         }
 
         if ($this->config->get('monitoring') && ($port = $this->config->get('monitoring.port')) && ($ip = $this->config->get('monitoring.listen'))) {
@@ -114,7 +114,7 @@ class Jaal
         $recIterator = new \RecursiveIteratorIterator($directory);
         $regex = new \RegexIterator($recIterator, '/^.+\.php$/i');
 
-        $http = $this->getService('http');
+        $httpd = $this->getDaemon('httpd');
         foreach($regex as $item) {
 
             $filePath = $item->getPathname();
@@ -127,11 +127,11 @@ class Jaal
     /**
      * @param $name http for now
      */
-    public function getService($name)
+    public function getDaemon($name)
     {
         $service = null;
 
-        if ($name == 'http') {
+        if ($name == 'httpd') {
             if (isset($this->$name) && is_object($this->$name))
                 $service = $this->$name;
         }

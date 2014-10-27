@@ -12,9 +12,8 @@ Class Connection extends \React\Socket\Connection implements ConnectionInterface
 
     public function __construct($stream, LoopInterface $loop)
     {
-        parent::__construct($stream, $loop);
-
         $this->militime = Time::millitime();
+        parent::__construct($stream, $loop);
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace Hathoora\Jaal\Daemons\Http\Client;
 
 use Hathoora\Jaal\IO\React\Socket\ConnectionInterface;
+use Hathoora\Jaal\IO\React\SocketClient\ConnectorInterface;
 
 Interface RequestInterface
 {
@@ -23,15 +24,15 @@ Interface RequestInterface
     /**
      * Sets connection stream to client or proxy
      *
-     * @param ConnectionInterface $stream
+     * @param ConnectionInterface|ConnectorInterface $stream
      * @return self
      */
-    public function setStream(ConnectionInterface $stream);
+    public function setStream($stream);
 
     /**
      * Returns the type of stream
      *
-     * @return string client|upstream
+     * @return string inbound|outbound
      */
     public function getStreamType();
 

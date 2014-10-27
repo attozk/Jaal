@@ -7,7 +7,7 @@ namespace Hathoora\Jaal\IO\Manager;
  *
  * @package Hathoora\Jaal\IO\Manager
  */
-class Inbound
+class InboundManager
 {
     /**
      * @var \React\EventLoop\LoopInterface
