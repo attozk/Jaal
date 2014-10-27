@@ -1,6 +1,6 @@
 <?php
 
-namespace Hathoora\Jaal\Httpd\Message;
+namespace Hathoora\Jaal\Daemons\Http\Message;
 
 use Guzzle\Http\Message\Request as GuzzleRequest;
 use Hathoora\Jaal\Util\Time;

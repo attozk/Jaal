@@ -1,6 +1,6 @@
 <?php
 
-namespace Hathoora\Jaal\Httpd\Client;
+namespace Hathoora\Jaal\Daemons\Http\Client;
 
 Class Request extends \http\Client\Request implements RequestInterface
 {

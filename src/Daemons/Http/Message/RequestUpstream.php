@@ -1,9 +1,9 @@
 <?php
 
-namespace Hathoora\Jaal\Httpd\Message;
+namespace Hathoora\Jaal\Daemons\Http\Message;
 
 use Hathoora\Jaal\Logger;
-use Hathoora\Jaal\Upstream\Httpd\Pool;
+use Hathoora\Jaal\Upstream\Http\Pool;
 use React\Stream\Stream;
 
 class RequestUpstream extends Request implements RequestUpstreamInterface

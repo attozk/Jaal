@@ -1,8 +1,8 @@
 <?php
 
-namespace Hathoora\Jaal\Httpd\Message\Parser;
+namespace Hathoora\Jaal\Daemons\Http\Message\Parser;
 
-use Hathoora\Jaal\Httpd\Client\Request;
+use Hathoora\Jaal\Daemons\Http\Client\Request;
 
 class Parser
 {

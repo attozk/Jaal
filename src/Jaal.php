@@ -2,15 +2,16 @@
 
 namespace Hathoora\Jaal;
 
-use Hathoora\Jaal\Httpd\Server as Httpd;
+use Hathoora\Jaal\Daemons\Http\Httpd;
 use Hathoora\Jaal\Monitoring\Monitoring;
+use Hathoora\Jaal\IO\React\Socket\Server as SocketServer;
 use Ratchet\Http\HttpServer;
 use Ratchet\Server\IoServer;
 use Ratchet\Wamp\WampServer;
 use Ratchet\WebSocket\WsServer;
 use React\Dns\Resolver\Resolver;
 use React\EventLoop\LoopInterface;
-use React\Socket\Server as SocketServer;
+
 use Dflydev\DotAccessConfiguration\YamlFileConfigurationBuilder;
 
 class Jaal
@@ -48,8 +49,8 @@ class Jaal
      */
     protected $config;
 
-    /** @var  \Hathoora\Jaal\Httpd\Server */
-    protected $httpd;
+    /** @var  \Hathoora\Jaal\Daemons\Http\Server */
+    protected $http;
 
     /** @var  \Hathoora\Jaal\Monitoring\Monitoring */
     protected $monitoring;
@@ -76,12 +77,12 @@ class Jaal
 
     public function initServices()
     {
-        if ($this->config->get('httpd') && ($port = $this->config->get('httpd.port')) && ($ip = $this->config->get('httpd.listen')))
+        if ($this->config->get('Http') && ($port = $this->config->get('Http.port')) && ($ip = $this->config->get('Http.listen')))
         {
             Logger::getInstance()->debug('HTTP listening on ' . $ip .':' . $port);
             $socket = new SocketServer($this->loop);
-            $this->httpd = new Httpd($this->loop, $socket, $this->dns);
-            $this->httpd->listen($port, $ip);
+            $this->http = new Httpd($this->loop, $socket, $this->dns);
+            $this->http->listen($port, $ip);
         }
 
         if ($this->config->get('monitoring') && ($port = $this->config->get('monitoring.port')) && ($ip = $this->config->get('monitoring.listen'))) {
@@ -113,7 +114,7 @@ class Jaal
         $recIterator = new \RecursiveIteratorIterator($directory);
         $regex = new \RegexIterator($recIterator, '/^.+\.php$/i');
 
-        $httpd = $this->getService('httpd');
+        $http = $this->getService('http');
         foreach($regex as $item) {
 
             $filePath = $item->getPathname();
@@ -130,7 +131,7 @@ class Jaal
     {
         $service = null;
 
-        if ($name == 'httpd') {
+        if ($name == 'http') {
             if (isset($this->$name) && is_object($this->$name))
                 $service = $this->$name;
         }

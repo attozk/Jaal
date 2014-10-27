@@ -1,8 +1,8 @@
 <?php
 
-namespace Hathoora\Jaal\Upstream\Httpd;
+namespace Hathoora\Jaal\Upstream\Http;
 
-use Hathoora\Jaal\Httpd\Message\RequestInterface;
+use Hathoora\Jaal\Daemons\Http\Message\RequestInterface;
 use Hathoora\Jaal\Jaal;
 
 class Factory
@@ -14,21 +14,21 @@ class Factory
      */
     public static function create(RequestInterface $request, $arrConfig)
     {
-        /** @var $httpd \Hathoora\Jaal\Httpd\Server */
-        $httpd = Jaal::getInstance()->getService('httpd');
+        /** @var $Http \Hathoora\Jaal\Daemons\Http\Server */
+        $Http = Jaal::getInstance()->getService('Http');
 
         /** @var $upstream \Hathoora\Jaal\Upstream\UpstreamManager */
-        $upstream = $httpd->upstreamManager;
+        $upstream = $Http->upstreamManager;
 
         $uniqueName = $request->getScheme() . ':' . $request->getHost() . ':' . $request->getPort();
 
         if (!isset($upstream->arrPools[$uniqueName])) {
-            $pool = new Pool($httpd->upstreamManager, $arrConfig);
+            $pool = new Pool($Http->upstreamManager, $arrConfig);
             $upstream->arrPools[$uniqueName] = $pool;
         } else {
             $pool = $upstream->arrPools[$uniqueName];
         }
 
-        $httpd->proxy($pool, $request);
+        $Http->proxy($pool, $request);
     }
 }

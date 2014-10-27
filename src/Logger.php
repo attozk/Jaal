@@ -119,7 +119,7 @@ class Logger implements LoggerInterface
      */
     public function debug($message, array $context = array())
     {
-        //echo $message . "\n";
+        echo $message . "\n";
     }
 
     /**

@@ -1,12 +1,12 @@
 <?php
 
-namespace Hathoora\Jaal\Upstream\Httpd;
+namespace Hathoora\Jaal\Upstream\Http;
 
 use Guzzle\Http\Message\AbstractMessage;
-use Hathoora\Jaal\Httpd\Message\RequestInterface;
-use Hathoora\Jaal\Httpd\Message\RequestUpstream;
-use Hathoora\Jaal\Httpd\Message\RequestUpstreamHeaders;
-use Hathoora\Jaal\Httpd\Message\RequestUpstreamInterface;
+use Hathoora\Jaal\Daemons\Http\Message\RequestInterface;
+use Hathoora\Jaal\Daemons\Http\Message\RequestUpstream;
+use Hathoora\Jaal\Daemons\Http\Message\RequestUpstreamHeaders;
+use Hathoora\Jaal\Daemons\Http\Message\RequestUpstreamInterface;
 use Hathoora\Jaal\Logger;
 use Dflydev\DotAccessConfiguration\Configuration;
 use React\Promise\Deferred;
@@ -17,22 +17,7 @@ use React\Stream\Stream;
 
 class Pool extends PoolBase
 {
-    /**
-     * // nginx inspired @http://nginx.org/en/docs/http/ngx_http_upstream_module.html#health_check
-     * array (
-     * 'keepalive' => 10,
-     *
-     * //'strategy' => 'round-robin|sticky|least_conn|etc...',
-     * 'servers' => array(
-     * 'weight:name' => array(
-     * 'ip' => '192.168.1.44',
-     * 'port' => 80,
-     * 'weight' => 5,
-     * 'max_fails' => 5,
-     * 'fail_timeout' => 10,
-     * 'max_conns' => 100,
-     * )
-     * )*/
+
 
     /**
      * Array of \React\SocketClient\ConnectorInterface

@@ -1,25 +1,23 @@
 <?php
 
-namespace Hathoora\Jaal\Httpd;
+namespace Hathoora\Jaal\Daemons\Http;
 
 use Hathoora\Jaal\ClientsManager;
-use Hathoora\Jaal\Httpd\Message\Parser\Parser;
-use Hathoora\Jaal\Httpd\Message\RequestFactory;
-use Hathoora\Jaal\Httpd\Message\RequestInterface;
-use Hathoora\Jaal\Httpd\Message\RequestUpstream;
-use Hathoora\Jaal\Httpd\Message\Response;
+use Hathoora\Jaal\IO\React\Socket\ConnectionInterface;
+use Hathoora\Jaal\IO\React\Socket\Server as SocketServer;
+use Hathoora\Jaal\Daemons\Http\Message\Parser\Parser;
+use Hathoora\Jaal\Daemons\Http\Message\RequestFactory;
+use Hathoora\Jaal\Daemons\Http\Message\RequestInterface;
+use Hathoora\Jaal\Daemons\Http\Message\RequestUpstream;
 use Hathoora\Jaal\Logger;
-use Hathoora\Jaal\Upstream\Httpd\Pool;
+use Hathoora\Jaal\Upstream\Http\Pool;
 use Hathoora\Jaal\Upstream\UpstreamManager;
 use Evenement\EventEmitter;
-use Hathoora\Jaal\Util\Time;
 use React\EventLoop\LoopInterface;
-use React\Socket\ConnectionInterface;
-use React\Socket\Server as TCPServer;
 use React\Dns\Resolver\Resolver;
 
 /** @event connection */
-class Server extends EventEmitter implements ServerInterface
+class Httpd extends EventEmitter implements HttpdInterface
 {
     /**
      * @var \React\EventLoop\LoopInterface
@@ -52,10 +50,10 @@ class Server extends EventEmitter implements ServerInterface
 
     /**
      * @param LoopInterface $loop
-     * @param TCPServer $socket
+     * @param SocketServer $socket
      * @param Resolver $dns
      */
-    public function __construct(LoopInterface $loop, TCPServer $socket, Resolver $dns)
+    public function __construct(LoopInterface $loop, SocketServer $socket, Resolver $dns)
     {
         $this->loop = $loop;
         $this->socket = $socket;
@@ -80,9 +78,10 @@ class Server extends EventEmitter implements ServerInterface
     private function init()
     {
         $this->socket->on('connection', function (ConnectionInterface $client) {
-            Logger::getInstance()->debug($client->getRemoteAddress() . ' has connected.');
-            $this->clientsManager->isAllowed($client)->then(
-                function ($client)  {
+            $this->clientsManager->add($client);
+
+            $client->isAllowed($client)->then(
+                function ($client) {
 
                     $client->on('close', function (ConnectionInterface $client) {
                         $this->handleClose($client);
@@ -95,14 +94,12 @@ class Server extends EventEmitter implements ServerInterface
                     $client->on('data', function ($data) use ($client) {
                         $this->handleData($data, $client);
                     });
-
                 },
-                // @TODO error handle
+                // @TODO error handle, emit somthing here?
                 function ($error) use ($client) {
-                    $client->end();
+                    $this->clientsManager->end($client);
                 }
             );
-
         });
     }
 
@@ -110,14 +107,11 @@ class Server extends EventEmitter implements ServerInterface
      * @param $data
      * @param ConnectionInterface $client
      */
-    protected function handleData($data,  ConnectionInterface $client)
+    protected function handleData($data, ConnectionInterface $client)
     {
-        /** @var $request \Hathoora\Jaal\Httpd\Message\Request */
-        //Parser::parseRequest($data);
-
+        /** @var $request \Hathoora\Jaal\Daemons\Http\Message\Request */
         $request = RequestFactory::getInstance()->fromMessage($data);
         $request->setClientSocket($client);
-
         $this->handleRequest($request);
     }
 
@@ -128,12 +122,13 @@ class Server extends EventEmitter implements ServerInterface
      */
     protected function handleRequest(RequestInterface $request)
     {
-        $this->emit('client.request' . ':' . $request->getPort(), [$request]);
+        $emitVhostKey = 'client.request.' . $request->getHost() . ':' . $request->getPort();
 
-        // @todo emit only when have a listener, otherwise default to client.request emit
-        $this->emit('client.request.' . $request->getHost() . ':' . $request->getPort(), [$request]);
-
-        Logger::getInstance()->debug($request->getClientSocket()->getRemoteAddress() . ' has requested for ' . $request->getMethod() . ' ' . $request->getUrl());
+        if (count($this->listeners($emitVhostKey))) {
+            $this->emit($emitVhostKey, [$request]);
+        } else {
+            $this->emit('client.request' . ':' . $request->getPort(), [$request]);
+        }
     }
 
     /**
@@ -151,11 +146,8 @@ class Server extends EventEmitter implements ServerInterface
      */
     protected function handleClose(ConnectionInterface $client)
     {
-        Logger::getInstance()->debug($client->getRemoteAddress() . ' has closed.');
-
         $this->emit('client.close', [$client]);
-        $this->clientsManager->remove($client);
-
+        $this->clientsManager->end($client);
     }
 
     /**
@@ -164,8 +156,6 @@ class Server extends EventEmitter implements ServerInterface
      */
     public function proxy(Pool $pool, RequestInterface $request)
     {
-        Logger::getInstance()->debug($request->getClientSocket()->getRemoteAddress() . ' ' . $request->getMethod() . ' ' . $request->getUrl() . ' >> UPSTREAM');
-
         $requestUpstream = new RequestUpstream($pool, $request);
         $requestUpstream->send();
     }
@@ -175,7 +165,6 @@ class Server extends EventEmitter implements ServerInterface
      */
     public function stats()
     {
-        // @todo
-        //print_r($this->stats);
+        print_r($this->clientsManager->count());
     }
 }

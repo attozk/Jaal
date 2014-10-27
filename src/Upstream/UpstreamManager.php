@@ -2,7 +2,7 @@
 
 namespace Hathoora\Jaal\Upstream;
 
-use Hathoora\Jaal\Httpd\Message\RequestInterface;
+use Hathoora\Jaal\Daemons\Http\Message\RequestInterface;
 use React\Promise\Deferred;
 use React\SocketClient\Connector;
 use React\SocketClient\ConnectorInterface;

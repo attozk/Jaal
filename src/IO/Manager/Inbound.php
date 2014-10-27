@@ -1,12 +1,13 @@
 <?php
 
-namespace Hathoora\Jaal;
+namespace Hathoora\Jaal\IO\Manager;
 
-use React\Promise\Deferred;
-use React\Socket\ConnectionInterface;
-use \SplObjectStorage;
-
-class ClientsManager
+/**
+ * Class Inbound for managing inbound connections
+ *
+ * @package Hathoora\Jaal\IO\Manager
+ */
+class Inbound
 {
     /**
      * @var \React\EventLoop\LoopInterface
@@ -19,7 +20,7 @@ class ClientsManager
     protected $protocol;
 
     /**
-     * @var SplObjectStorage
+     * @var SplObjectStorage for storing ConnectionInterface
      */
     protected $clients;
 
