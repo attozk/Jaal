@@ -1,10 +1,12 @@
 <?php
 
 namespace Hathoora\Jaal\IO\Manager;
+
 use React\Dns\Resolver\Resolver;
 use React\EventLoop\LoopInterface;
 use React\SocketClient\Connector;
 use React\SocketClient\ConnectorInterface;
+use SplObjectStorage;
 
 /**
  * Class Outbound for managing outbound connections
@@ -33,7 +35,7 @@ class OutboundManager
         $this->loop = $loop;
         $this->dns = $dns;
         $this->protocol = $protocol;
-        $this->connectors = new \SplObjectStorage();
+        $this->connectors = new SplObjectStorage();
     }
 
     public function add(ConnectorInterface $connector)

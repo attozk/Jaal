@@ -21,6 +21,18 @@ Interface RequestInterface
      */
     public function getRequestId();
 
+    public function removeHeader($header);
+
+    public function getScheme();
+
+    public function getPort();
+
+    public function getHost();
+
+    public function getPath();
+
+    public function getQuery();
+
     /**
      * Sets connection stream to client or proxy
      *
@@ -62,4 +74,8 @@ Interface RequestInterface
      * Gets execution time of request in miliseconds
      */
     public function getExecutionTime();
+
+    public function setResponse(ResponseInterface $response);
+
+    public function send();
 }

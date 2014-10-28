@@ -19,7 +19,7 @@
         "react/promise": "~2.0",
         "symfony/yaml": "2.5.5",
         "dflydev/dot-access-configuration": "1.0.0",
-        "guzzle/guzzle": "3.9.*@dev",
+        "guzzlehttp/guzzle": "5.0.1",
         "psr/log": "dev-master",
         "cboden/ratchet": "0.4.*@dev"
     },

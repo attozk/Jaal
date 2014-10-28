@@ -2,19 +2,17 @@
 
 namespace Hathoora\Jaal\Daemons\Http;
 
-use Hathoora\Jaal\Daemons\Http\Vhost\Factory;
+use Hathoora\Jaal\Daemons\Http\Message\Parser;
+use Hathoora\Jaal\Daemons\Http\Client\RequestInterface as ClientRequestInterface;
+use Hathoora\Jaal\Daemons\Http\Upstream\Request as UpstreamRequest;
+use Hathoora\Jaal\Daemons\Http\Upstream\RequestInterface as UpstreamRequestInterface;
+use Hathoora\Jaal\Daemons\Http\Vhost\Factory as VhostFactory;
 Use Hathoora\Jaal\IO\Manager\InboundManager;
 use Hathoora\Jaal\IO\Manager\OutboundManager;
 Use Hathoora\Jaal\IO\Manager\outoundManager;
 use Hathoora\Jaal\IO\React\Socket\ConnectionInterface;
 use Hathoora\Jaal\IO\React\Socket\Server as SocketServer;
-use Hathoora\Jaal\Daemons\Http\Message\Parser\Parser;
-use Hathoora\Jaal\Daemons\Http\Message\RequestFactory;
-use Hathoora\Jaal\Daemons\Http\Message\RequestInterface;
-use Hathoora\Jaal\Daemons\Http\Message\RequestUpstream;
 use Hathoora\Jaal\Logger;
-use Hathoora\Jaal\Upstream\Http\Pool;
-use Hathoora\Jaal\Upstream\UpstreamManager;
 use Evenement\EventEmitter;
 use React\EventLoop\LoopInterface;
 use React\Dns\Resolver\Resolver;
@@ -95,7 +93,7 @@ class Httpd extends EventEmitter implements HttpdInterface
                     });
 
                     $client->on('data', function ($data) use ($client) {
-                        $this->handleData($data, $client);
+                        $this->handleData($client, $data);
                     });
                 },
                 // @TODO error handle, emit somthing here?
@@ -107,23 +105,25 @@ class Httpd extends EventEmitter implements HttpdInterface
     }
 
     /**
-     * @param $data
      * @param ConnectionInterface $client
+     * @param $data
      */
-    protected function handleData($data, ConnectionInterface $client)
+    protected function handleData(ConnectionInterface $client, $data)
     {
-        /** @var $request \Hathoora\Jaal\Daemons\Http\Message\Request */
-        $request = RequestFactory::getInstance()->fromMessage($data);
-        $request->setClientSocket($client);
+        /** @var $request \use Hathoora\Jaal\Daemons\Http\Client\RequestRequestInterface */
+        $request = Parser::parseRequest($data);
+        $request->setStream($client);
+
+        Logger::getInstance()->debug($request->getRequestMethod() . ' ' . $request->getRequestUrl());
         $this->handleRequest($request);
     }
 
     /**
      * @emit client.request:PORT
      * @emit client.request.HOST:PORT
-     * @param RequestInterface $request
+     * @param ClientRequestInterface $request
      */
-    protected function handleRequest(RequestInterface $request)
+    protected function handleRequest(ClientRequestInterface $request)
     {
         $emitVhostKey = 'client.request.' . $request->getHost() . ':' . $request->getPort();
 
@@ -159,8 +159,10 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     public function proxy($arrVhostConfig, RequestInterface $request)
     {
-        $vhost = new Factory($arrVhostConfig, $request->getScheme(), $request->getHost(), $request->getPort());
-        (new RequestUpstream($vhost, $request))->send();
+        $vhost = VhostFactory::create($arrVhostConfig, $request->getScheme(), $request->getHost(), $request->getPort());
+        print_r($vhost);
+
+        (new Request($vhost, $request))->send();
     }
 
     /**

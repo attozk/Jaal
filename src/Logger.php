@@ -11,6 +11,39 @@ class Logger implements LoggerInterface
      */
     protected static $instance;
 
+    /**
+     * Minimum debug level
+     */
+    private $level;
+
+    private $arrColorsFG = array(
+        'black' => '0;30',
+        'darkGray' => '1;30',
+        'blue' => '0;34',
+        'lightBlue' => '1;34',
+        'green' => '0;32',
+        'lightGreen' => '1;32',
+        'cyan' => '0;36',
+        'lightCyan' => '1;36',
+        'red' => '0;31',
+        'lightRed' => '1;31',
+        'purple' => '0;35',
+        'lightPurple' => '1;35',
+        'brown' => '0;33',
+        'yellow' => '1;33',
+        'lightGray' => '0;37',
+        'white' => '1;37' );
+
+    private $arrColorsBG = array(
+        'black' => '40',
+        'red' => '41',
+        'green' => '42',
+        'yellow' => '43',
+        'blue' => '44',
+        'magenta' => '45',
+        'cyan' => '46',
+        'light_gray' => '47');
+
     private function __construct()
     {
     }
@@ -24,7 +57,7 @@ class Logger implements LoggerInterface
      */
     public function emergency($message, array $context = array())
     {
-        // TODO: Implement emergency() method.
+        $this->log('EMERGENCY', $message, $context);
     }
 
     /**
@@ -39,7 +72,7 @@ class Logger implements LoggerInterface
      */
     public function alert($message, array $context = array())
     {
-        // TODO: Implement alert() method.
+        $this->log('ALERT', $message, $context);
     }
 
     /**
@@ -53,7 +86,7 @@ class Logger implements LoggerInterface
      */
     public function critical($message, array $context = array())
     {
-        // TODO: Implement critical() method.
+        $this->log('CRITICAL', $message, $context);
     }
 
     /**
@@ -66,7 +99,7 @@ class Logger implements LoggerInterface
      */
     public function error($message, array $context = array())
     {
-        // TODO: Implement error() method.
+        $this->log('ERROR', $message, $context);
     }
 
     /**
@@ -81,7 +114,7 @@ class Logger implements LoggerInterface
      */
     public function warning($message, array $context = array())
     {
-        // TODO: Implement warning() method.
+        $this->log('WARNING', $message, $context);
     }
 
     /**
@@ -93,7 +126,7 @@ class Logger implements LoggerInterface
      */
     public function notice($message, array $context = array())
     {
-        // TODO: Implement notice() method.
+        $this->log('NOTICE', $message, $context);
     }
 
     /**
@@ -107,7 +140,7 @@ class Logger implements LoggerInterface
      */
     public function info($message, array $context = array())
     {
-        // TODO: Implement info() method.
+        $this->log('INFO', $message, $context);
     }
 
     /**
@@ -119,7 +152,7 @@ class Logger implements LoggerInterface
      */
     public function debug($message, array $context = array())
     {
-        echo $message . "\n";
+        $this->log('DEBUG', $message, $context);
     }
 
     /**
@@ -132,7 +165,7 @@ class Logger implements LoggerInterface
      */
     public function log($level, $message, array $context = array())
     {
-        // TODO: Implement log() method.
+        echo '[' . $level .'] ' . $message . "\n";
     }
 
     /**

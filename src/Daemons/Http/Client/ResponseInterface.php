@@ -2,7 +2,7 @@
 
 namespace Hathoora\Jaal\Daemons\Http\Client;
 
-Interface ResponceInterface
+interface ResponseInterface
 {
 
 }

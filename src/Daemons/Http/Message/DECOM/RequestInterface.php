@@ -1,11 +1,11 @@
 <?php
 
-namespace Hathoora\Jaal\Daemons\Http\Message;
+namespace Hathoora\Jaal\Daemons\Http\Messages;
 
 use React\Socket\ConnectionInterface;
 Use Guzzle\Http\Message\RequestInterface as GuzzleRequestInterface;
 
-interface RequestInterface extends GuzzleRequestInterface
+interface RequestInterfaces extends GuzzleRequestInterface
 {
     public function setRequestId();
 

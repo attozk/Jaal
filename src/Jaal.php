@@ -11,7 +11,6 @@ use Ratchet\Wamp\WampServer;
 use Ratchet\WebSocket\WsServer;
 use React\Dns\Resolver\Resolver;
 use React\EventLoop\LoopInterface;
-
 use Dflydev\DotAccessConfiguration\YamlFileConfigurationBuilder;
 
 class Jaal
@@ -42,7 +41,7 @@ class Jaal
      * Path to conf.d
      * @var
      */
-    protected $confDDirPath;
+    protected $confDPath;
 
     /**
      * @var \Dflydev\DotAccessConfiguration\Configuration
@@ -63,9 +62,9 @@ class Jaal
         $this->loop = $loop;
         $this->dns = $dns;
         $this->configFilePath = realpath(__DIR__ .'/../conf.yml');
-        $this->confDDirPath = realpath(__DIR__ .'/../conf.d/');
+        $this->confDPath = realpath(__DIR__ .'/../conf.d/');
         $this->initConfig();
-        $this->initServices();
+        $this->initDaemons();
         $this->initConfD();
     }
 
@@ -75,11 +74,11 @@ class Jaal
         $this->config = $configBuilder->build();
     }
 
-    public function initServices()
+    public function initDaemons()
     {
         if ($this->config->get('httpd') && ($port = $this->config->get('httpd.port')) && ($ip = $this->config->get('httpd.listen')))
         {
-            Logger::getInstance()->debug('HTTP listening on ' . $ip .':' . $port);
+            Logger::getInstance()->info('HTTPD listening on ' . $ip .':' . $port);
             $socket = new SocketServer($this->loop);
             $this->httpd = new Httpd($this->loop, $socket, $this->dns);
             $this->httpd->listen($port, $ip);
@@ -110,7 +109,7 @@ class Jaal
      */
     public function initConfD()
     {
-        $directory = new \RecursiveDirectoryIterator($this->confDDirPath);
+        $directory = new \RecursiveDirectoryIterator($this->confDPath);
         $recIterator = new \RecursiveIteratorIterator($directory);
         $regex = new \RegexIterator($recIterator, '/^.+\.php$/i');
 
@@ -118,7 +117,7 @@ class Jaal
         foreach($regex as $item) {
 
             $filePath = $item->getPathname();
-            Logger::getInstance()->debug('Included conf.d >>> '. $filePath);
+            Logger::getInstance()->debug('HTTPD config file loaded: '. $filePath);
 
             include($filePath);
         }

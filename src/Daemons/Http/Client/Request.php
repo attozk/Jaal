@@ -8,18 +8,28 @@ use Hathoora\Jaal\Util\Time;
 
 Class Request extends \http\Client\Request implements RequestInterface
 {
-    private $id;
-    private $stream;
-    private $streamType;  // inbound|outbound
-    private $militime;
-    private $took;        // took milli seconds to execute
+    protected $id;
+    protected $stream;
+    protected $streamType;  // inbound|outbound
+    protected $militime;
+    protected $took;        // took milli seconds to execute
+    protected $urlParts = array();
+
+    /**
+     * @var ResponseInterface
+     */
+    protected $response;
 
     /**
      * Create a new client request message to be enqueued and sent by http\Client.
      **/
-    public function __construct($meth = NULL, $url = NULL, array $headers = NULL, \http\Message\Body $body = NULL)
+    public function __construct($meth = null, $url = null, array $headers = null, \http\Message\Body $body = null)
     {
-        parent::_construct($meth, $url, $headers, $body);
+        parent::__construct($meth, $url, $headers, $body);
+
+        $this->urlParts = parse_url($url);
+
+        $this->setRequestId();
     }
 
     /**
@@ -29,7 +39,7 @@ Class Request extends \http\Client\Request implements RequestInterface
      */
     public function setRequestId()
     {
-        $this->id = uniqid();
+        $this->id = uniqid('Request_');
     }
 
     /**
@@ -42,6 +52,38 @@ Class Request extends \http\Client\Request implements RequestInterface
         return $this->id;
     }
 
+    public function removeHeader($header)
+    {
+        if (isset($this->headers[$header])) {
+            unset($this->headers[$header]);
+        }
+    }
+
+    public function getScheme()
+    {
+        return isset($this->urlParts['scheme']) ? $this->urlParts['scheme'] : null;
+    }
+
+    public function getPort()
+    {
+        return isset($this->urlParts['port']) ? $this->urlParts['port'] : null;
+    }
+
+    public function getHost()
+    {
+        return isset($this->urlParts['host']) ? $this->urlParts['host'] : null;
+    }
+
+    public function getPath()
+    {
+        return isset($this->urlParts['path']) ? $this->urlParts['path'] : null;
+    }
+
+    public function getQuery()
+    {
+        return isset($this->urlParts['query']) ? $this->urlParts['query'] : null;
+    }
+
     /**
      * Sets connection stream to client or proxy
      *
@@ -52,10 +94,13 @@ Class Request extends \http\Client\Request implements RequestInterface
     {
         $this->stream = $stream;
 
-        if ($this->stream instanceof ConnectorInterface)
+        if ($this->stream instanceof ConnectorInterface) {
             $this->streamType = 'inbound';
-        else if ($this->stream instanceof ConnectorInterface)
-            $this->streamType = 'outbound';
+        } else {
+            if ($this->stream instanceof ConnectorInterface) {
+                $this->streamType = 'outbound';
+            }
+        }
     }
 
     /**
@@ -86,8 +131,9 @@ Class Request extends \http\Client\Request implements RequestInterface
      */
     public function setStartTime($miliseconds = null)
     {
-        if ($miliseconds)
+        if ($miliseconds) {
             $miliseconds = Time::millitime();
+        }
 
         $this->militime = $miliseconds;
     }
@@ -99,8 +145,7 @@ Class Request extends \http\Client\Request implements RequestInterface
      */
     public function setExecutionTime()
     {
-        if (!$this->took)
-        {
+        if (!$this->took) {
             //$this->took = Time::
         }
     }
@@ -111,5 +156,16 @@ Class Request extends \http\Client\Request implements RequestInterface
     public function getExecutionTime()
     {
         return $this->took;
+    }
+
+    public function setResponse(ResponseInterface $response)
+    {
+        $this->response = $response;
+    }
+
+    public function send()
+    {
+        //$this->stream->write($this->responseJaal->getRawHeaders() . $this->responseJaal->getBody());
+        $this->stream->end();
     }
 }

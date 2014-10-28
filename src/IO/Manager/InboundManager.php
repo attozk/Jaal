@@ -2,6 +2,9 @@
 
 namespace Hathoora\Jaal\IO\Manager;
 
+use Hathoora\Jaal\IO\React\Socket\ConnectionInterface;
+use \SplObjectStorage;
+
 /**
  * Class Inbound for managing inbound connections
  *

@@ -1,6 +1,6 @@
 <?php
 
-namespace Hathoora\Jaal\Daemons\Http\Message\Parser;
+namespace Hathoora\Jaal\Daemons\Http\Message;
 
 use Hathoora\Jaal\Daemons\Http\Client\Request;
 
@@ -35,12 +35,13 @@ class Parser
         $parsed['request_url'] = self::getUrlPartsFromMessage(isset($parts['start_line'][1]) ? $parts['start_line'][1] : '' , $parsed);
         $parsed['url'] = self::buildUrl($parsed['request_url']);
 
-        print_r($parts);
-        print_r($parsed);
+        $body = null;
+        if ($parsed['body']) {
+            $body = new \http\Message\Body();
+            $body->append($parsed['body']);
+        }
 
-        die;
-
-        new Request($parsed['method'], $parsed['url'], $parsed['headers']);
+        $request = new Request($parsed['method'], $parsed['url'], $parsed['headers'], $body);
 
         // EntityEnclosingRequest adds an "Expect: 100-Continue" header when using a raw request body for PUT or POST
         // requests. This factory method should accurately reflect the message, so here we are removing the Expect
@@ -52,7 +53,7 @@ class Parser
         return $request;
     }
 
-    public function parseResponse($message)
+    public static function parseResponse($message)
     {
         if (!$message) {
             return false;
@@ -79,7 +80,7 @@ class Parser
      *
      * @return array
      */
-    protected static function parseMessage($message)
+    public static function parseMessage($message)
     {
         $startLine = null;
         $headers = array();
@@ -218,7 +219,7 @@ class Parser
         }
 
         // Add the query string if present
-        if (isset($parts['query'])) {
+        if (!empty($parts['query'])) {
             $url .= '?' . $parts['query'];
         }
 
