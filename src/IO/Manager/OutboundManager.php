@@ -41,6 +41,7 @@ class OutboundManager
     public function add(ConnectorInterface $connector)
     {
         $this->connectors->attach($connector);
+        $this->connectors->a
     }
 
     public function remove(ConnectorInterface $connector)

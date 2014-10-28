@@ -3,6 +3,7 @@
 namespace Hathoora\Jaal\Daemons\Http\Vhost;
 
 use Dflydev\DotAccessConfiguration\Configuration;
+use Hathoora\Jaal\IO\Manager\OutboundManager;
 
 Class Vhost
 {
@@ -28,9 +29,14 @@ Class Vhost
      */
     public $config;
 
-    public function __construct($arrConfig)
+    /**
+     * @param $arrConfig
+     * @param OutboundManager $outboundIOManager
+     */
+    public function __construct($arrConfig, OutboundManager $outboundIOManager)
     {
         $this->config = new Configuration($arrConfig);
+        $this->outboundIOManager = $outboundIOManager;
     }
 
     public function init($arrConfig)
@@ -140,11 +146,11 @@ Class Vhost
         return $promise;
     }
 
-    public function getUpstreamSocket(RequestUpstream $requestUpstream)
+    public function getUpstreamSocket($requestUpstream)
     {
         $arrServer = $this->getAvailableUpstreamServer();
 
-        return $this->upstreamSocketFactory($arrServer, $requestUpstream);
+        //return $this->upstreamSocketFactory($arrServer, $requestUpstream);
     }
 
 }
