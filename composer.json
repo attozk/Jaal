@@ -13,13 +13,11 @@
     ],
     "require": {
         "php": ">=5.4.0",
-        "ext-zlib": "*",
         "react/socket": "0.4.*",
         "react/socket-client": "0.4.*",
         "react/promise": "~2.0",
         "symfony/yaml": "2.5.5",
         "dflydev/dot-access-configuration": "1.0.0",
-        "guzzlehttp/guzzle": "5.0.1",
         "psr/log": "dev-master",
         "cboden/ratchet": "0.4.*@dev"
     },

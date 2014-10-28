@@ -2,17 +2,25 @@
 
 namespace Hathoora\Jaal\Daemons\Http\Message;
 
-use Hathoora\Jaal\Daemons\Http\Client\Request;
+use Hathoora\Jaal\Daemons\Http\Client\Request as ClientRequest;
 
+/**
+ * Request and response parser used by Guzzle
+ */
 class Parser
 {
+    /**
+     * Parse an HTTP request message into an associative array of parts.
+     *
+     * @param string $message HTTP request to parse
+     *
+     * @return array|bool Returns false if the message is invalid
+     */
     public static function parseRequest($message)
     {
-        if (!$message) {
+        if (!($parts = self::parseMessage($message))) {
             return false;
         }
-
-        $parts = self::parseMessage($message);
 
         // Parse the protocol and protocol version
         if (isset($parts['start_line'][2])) {
@@ -24,66 +32,89 @@ class Parser
             $version = '1.1';
         }
 
-        $parsed = array(
-            'method'   => strtoupper($parts['start_line'][0]),
+        $parsed = [
+            'method' => strtoupper($parts['start_line'][0]),
             'protocol' => $protocol,
-            'version'  => $version,
-            'headers'  => $parts['headers'],
-            'body'     => $parts['body']
-        );
+            'protocol_version' => $version,
+            'headers' => $parts['headers'],
+            'body' => $parts['body']
+        ];
 
-        $parsed['request_url'] = self::getUrlPartsFromMessage(isset($parts['start_line'][1]) ? $parts['start_line'][1] : '' , $parsed);
-        $parsed['url'] = self::buildUrl($parsed['request_url']);
+        $parsed['request_url'] = self::getUrlPartsFromMessage(
+            (isset($parts['start_line'][1]) ? $parts['start_line'][1] : ''), $parsed);
 
-        $body = null;
-        if ($parsed['body']) {
-            $body = new \http\Message\Body();
-            $body->append($parsed['body']);
-        }
-
-        $request = new Request($parsed['method'], $parsed['url'], $parsed['headers'], $body);
-
-        // EntityEnclosingRequest adds an "Expect: 100-Continue" header when using a raw request body for PUT or POST
-        // requests. This factory method should accurately reflect the message, so here we are removing the Expect
-        // header if one was not supplied in the message.
-        if (!isset($parsed['headers']['Expect']) && !isset($parsed['headers']['expect'])) {
-            $request->removeHeader('Expect');
-        }
-
-        return $request;
+        return $parsed;
     }
 
-    public static function parseResponse($message)
+    public static function getClientRequest($message)
     {
-        if (!$message) {
+        if (!($parsed = self::parseRequest($message))) {
             return false;
         }
 
-        $parts = $this->parseMessage($message);
-        list($protocol, $version) = explode('/', trim($parts['start_line'][0]));
+        return (new ClientRequest($parsed['method'], '', $parsed['headers']))
+            ->setProtocolVersion($parsed['protocol_version'])
+            ->setScheme($parsed['request_url']['scheme'])
+            ->setHost($parsed['request_url']['host'])
+            ->setPath($parsed['request_url']['path'])
+            ->setPort($parsed['request_url']['port'])
+            ->setQuery($parsed['request_url']['query'])
+            ->setBody($parsed['body']);
+    }
 
-        return array(
-            'protocol'      => $protocol,
-            'version'       => $version,
-            'code'          => $parts['start_line'][1],
-            'reason_phrase' => isset($parts['start_line'][2]) ? $parts['start_line'][2] : '',
-            'headers'       => $parts['headers'],
-            'body'          => $parts['body']
-        );
+    /**
+     * Parse an HTTP response message into an associative array of parts.
+     *
+     * @param string $message HTTP response to parse
+     *
+     * @return array|bool Returns false if the message is invalid
+     */
+    public static function parseResponse($message)
+    {
+        if (!($parts = self::parseMessage($message))) {
+            return false;
+        }
+
+        if (isset($parts['start_line']) && is_array($parts['start_line']) && count($parts['start_line']) >= 3) {
+            list($protocol, $version) = explode('/', trim($parts['start_line'][0]));
+
+            return [
+                'protocol' => $protocol,
+                'protocol_version' => $version,
+                'code' => $parts['start_line'][1],
+                'reason_phrase' => isset($parts['start_line'][2]) ? $parts['start_line'][2] : '',
+                'headers' => $parts['headers'],
+                'body' => $parts['body']
+            ];
+        }
+    }
+
+    public static function getResponse($message)
+    {
+        if (!($parsed = self::parseResponse($message))) {
+            return false;
+        }
+
+        return (new Response($parsed['code'], $parsed['headers']))
+            ->setReasonPhrase($parsed['reason_phrase'])
+            ->setBody($parsed['body']);
     }
 
     /**
      * Parse a message into parts
      *
-     * @package Guzzle
      * @param string $message Message to parse
      *
-     * @return array
+     * @return array|bool
      */
-    public static function parseMessage($message)
+    private static function parseMessage($message)
     {
+        if (!$message) {
+            return false;
+        }
+
         $startLine = null;
-        $headers = array();
+        $headers = [];
         $body = '';
 
         // Iterate over each line in the message, accounting for line endings
@@ -110,35 +141,32 @@ class Parser
                 if (!isset($headers[$key])) {
                     $headers[$key] = $value;
                 } elseif (!is_array($headers[$key])) {
-                    $headers[$key] = array($headers[$key], $value);
+                    $headers[$key] = [$headers[$key], $value];
                 } else {
                     $headers[$key][] = $value;
                 }
             }
         }
 
-        return array(
+        return [
             'start_line' => $startLine,
-            'headers'    => $headers,
-            'body'       => $body
-        );
+            'headers' => $headers,
+            'body' => $body
+        ];
     }
 
     /**
      * Create URL parts from HTTP message parts
      *
      * @param string $requestUrl Associated URL
-     * @param array  $parts      HTTP message parts
+     * @param array $parts HTTP message parts
      *
      * @return array
      */
-    protected static function getUrlPartsFromMessage($requestUrl, array $parts)
+    private static function getUrlPartsFromMessage($requestUrl, array $parts)
     {
         // Parse the URL information from the message
-        $urlParts = array(
-            'path'   => $requestUrl,
-            'scheme' => 'http'
-        );
+        $urlParts = ['path' => $requestUrl, 'scheme' => 'http'];
 
         // Check for the Host header
         if (isset($parts['headers']['Host'])) {
@@ -154,7 +182,7 @@ class Parser
         } else {
             $hostParts = explode(':', $urlParts['host']);
             $urlParts['host'] = trim($hostParts[0]);
-            $urlParts['port'] = (int) trim($hostParts[1]);
+            $urlParts['port'] = (int)trim($hostParts[1]);
             if ($urlParts['port'] == 443) {
                 $urlParts['scheme'] = 'https';
             }
@@ -171,63 +199,5 @@ class Parser
         }
 
         return $urlParts;
-    }
-
-    /**
-     * Build a URL from parse_url parts. The generated URL will be a relative URL if a scheme or host are not provided.
-     *
-     * @param array $parts Array of parse_url parts
-     *
-     * @return string
-     */
-    public static function buildUrl(array $parts)
-    {
-        $url = $scheme = '';
-
-        if (isset($parts['scheme'])) {
-            $scheme = $parts['scheme'];
-            $url .= $scheme . ':';
-        }
-
-        if (isset($parts['host'])) {
-            $url .= '//';
-            if (isset($parts['user'])) {
-                $url .= $parts['user'];
-                if (isset($parts['pass'])) {
-                    $url .= ':' . $parts['pass'];
-                }
-                $url .=  '@';
-            }
-
-            $url .= $parts['host'];
-
-            // Only include the port if it is not the default port of the scheme
-            if (isset($parts['port'])
-                && !(($scheme == 'http' && $parts['port'] == 80) || ($scheme == 'https' && $parts['port'] == 443))
-            ) {
-                $url .= ':' . $parts['port'];
-            }
-        }
-
-        // Add the path component if present
-        if (isset($parts['path']) && 0 !== strlen($parts['path'])) {
-            // Always ensure that the path begins with '/' if set and something is before the path
-            if ($url && $parts['path'][0] != '/' && substr($url, -1)  != '/') {
-                $url .= '/';
-            }
-            $url .= $parts['path'];
-        }
-
-        // Add the query string if present
-        if (!empty($parts['query'])) {
-            $url .= '?' . $parts['query'];
-        }
-
-        // Ensure that # is only added to the url if fragment contains anything.
-        if (isset($parts['fragment'])) {
-            $url .= '#' . $parts['fragment'];
-        }
-
-        return $url;
     }
 }

@@ -14,7 +14,18 @@ class Logger implements LoggerInterface
     /**
      * Minimum debug level
      */
-    private $level;
+    private $levelWeights = array(
+        'DEBUG' => 0,
+        'INFO' => 1,
+        'NOTICE' => 2,
+        'WARNING' => 3,
+        'ERROR' => 4,
+        'CRITICAL' => 5,
+        'ALERT' => 6,
+        'EMERGENCY' => 7
+    );
+
+    private $levelWeight = 4;
 
     private $arrColorsFG = array(
         'black' => '0;30',
@@ -46,6 +57,7 @@ class Logger implements LoggerInterface
 
     private function __construct()
     {
+        $this->levelWeight = 0;
     }
 
     /**
@@ -165,7 +177,8 @@ class Logger implements LoggerInterface
      */
     public function log($level, $message, array $context = array())
     {
-        echo '[' . $level .'] ' . $message . "\n";
+        if ((is_numeric($level) && $level >= $this->levelWeight) || ($this->levelWeights[$level] >= $this->levelWeight))
+            echo '[' . $level .'] ' . $message . "\n";
     }
 
     /**

@@ -45,6 +45,11 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     public $outboundIOManager;
 
+    /**
+     * @var array stores requests
+     */
+    private $arrRequests = array();
+
     private $arrConfig = array(
         'maxConnectionsPerIP' => 10,             // maximum concurrent connections per IP
     );
@@ -110,11 +115,13 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     protected function handleData(ConnectionInterface $client, $data)
     {
-        /** @var $request \use Hathoora\Jaal\Daemons\Http\Client\RequestRequestInterface */
-        $request = Parser::parseRequest($data);
-        $request->setStream($client);
+        /** @var $request \Hathoora\Jaal\Daemons\Http\Client\RequestInterface */
+        $request = Parser::getClientRequest($data);
+        $request->setStartTime()
+                ->setStream($client)
+                ->setState('Ready');
 
-        Logger::getInstance()->debug($request->getRequestMethod() . ' ' . $request->getRequestUrl());
+        Logger::getInstance()->debug($request->getMethod() . ' ' . $request->getUrl());
         $this->handleRequest($request);
     }
 
@@ -155,14 +162,12 @@ class Httpd extends EventEmitter implements HttpdInterface
 
     /**
      * @param array $arrVhostConfig
-     * @param RequestInterface $request
+     * @param ClientRequestInterface $request
      */
-    public function proxy($arrVhostConfig, RequestInterface $request)
+    public function proxy($arrVhostConfig, ClientRequestInterface $request)
     {
         $vhost = VhostFactory::create($arrVhostConfig, $request->getScheme(), $request->getHost(), $request->getPort());
-        print_r($vhost);
-
-        (new Request($vhost, $request))->send();
+        (new UpstreamRequest($vhost, $request))->setBody($request->getBody())->setState('Pending')->send();
     }
 
     /**

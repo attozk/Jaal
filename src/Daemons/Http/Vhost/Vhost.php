@@ -4,6 +4,9 @@ namespace Hathoora\Jaal\Daemons\Http\Vhost;
 
 use Dflydev\DotAccessConfiguration\Configuration;
 use Hathoora\Jaal\IO\Manager\OutboundManager;
+use Hathoora\Jaal\Daemons\Http\Upstream\Request as UpstreamRequest;
+use React\Promise\Deferred;
+use React\Stream\Stream;
 
 Class Vhost
 {
@@ -30,13 +33,18 @@ Class Vhost
     public $config;
 
     /**
+     * @var
+     */
+    public $arrUpstreamConnectors;
+
+    /**
      * @param $arrConfig
      * @param OutboundManager $outboundIOManager
      */
     public function __construct($arrConfig, OutboundManager $outboundIOManager)
     {
-        $this->config = new Configuration($arrConfig);
         $this->outboundIOManager = $outboundIOManager;
+        $this->init($arrConfig);
     }
 
     public function init($arrConfig)
@@ -81,76 +89,19 @@ Class Vhost
         return array_pop($arrUpstreams['servers']);
     }
 
-    public function upstreamSocketFactory($arrServer, RequestUpstream $requestUpstream)
-    {
-        $ip = $arrServer['ip'];
-        $port = $arrServer['port'];
-        $failTimeout = $arrServer['fail_timeout'];
-        $MaxFails = $arrServer['max_fails'];
-
-        $key = $ip . ':' . $port;
-        $connector = null;
-        $deferred = new Deferred();
-        $promise = $deferred->promise();
-
-        if (isset($this->upstreamConnectors[$key])) {
-
-            // stream is connected?
-            if ($this->upstreamConnectors[$key]['status'] == 'connected') {
-                $deferred->resolve($this->upstreamConnectors[$key]['stream']);
-            }
-        }
-
-        // reuse existing stream...
-        if (!isset($this->upstreamConnectors[$key]) || (isset($this->upstreamConnectors[$key]) && $this->upstreamConnectors[$key]['status'] != 'connected')) {
-
-            $connector = $this->upstreamManager->buildConnector();
-
-            if (!isset($this->upstreamConnectors[$key])) {
-
-                $this->upstreamConnectors[$key] = array(
-                    'connector' => $connector,
-                    'start' => null,
-                    'status' => 'pending',
-                    'connectCount' => 0
-                );
-            }
-
-            // @TODO keep track of timeout and implement fail_timeout
-            $connector->create($ip, $port)->then(function (Stream $stream) use ($deferred, $key, $requestUpstream) {
-                    $this->upstreamConnectors[$key]['start'] = time();
-                    $this->upstreamConnectors[$key]['stream'] = $stream;
-                    $this->upstreamConnectors[$key]['status'] = 'connected';
-                    $this->upstreamConnectors[$key]['connectCount']++;
-
-                    Logger::getInstance()->debug('Upstream connected for ' . $key);
-
-                    $stream->on('close', function () use ($key) {
-                        Logger::getInstance()->debug('Upstream closed for ' . $key);
-                        $this->upstreamConnectors[$key]['status'] = 'disconnected';
-                    });
-
-                    $deferred->resolve($stream);
-                },
-                function ($error) use ($deferred, $key, $requestUpstream) {
-                    Logger::getInstance()->debug('Upstream closed for ' . $key);
-                    $this->upstreamConnectors[$key]['status'] = 'error';
-
-                    // close client?
-                    //$requestUpstream->getClientRequest()->send();
-
-                    $deferred->reject();
-                });
-        }
-
-        return $promise;
-    }
-
-    public function getUpstreamSocket($requestUpstream)
+    /**
+     * @param UpstreamRequest $request
+     * @return \React\Promise\Promise
+     */
+    public function getUpstreamSocket(UpstreamRequest $request)
     {
         $arrServer = $this->getAvailableUpstreamServer();
+        $ip = $arrServer['ip'];
+        $port = $arrServer['port'];
+        $keepAlive = $this->config->get('upstreams.keepalive');
+        $timeout = $this->config->get('upstreams.timeout');
 
-        //return $this->upstreamSocketFactory($arrServer, $requestUpstream);
+        return $this->outboundIOManager->buildKeepAliveConnector($ip, $port, $keepAlive, $timeout);
     }
 
 }

@@ -1,12 +1,11 @@
 <?php
 
-namespace Hathoora\Jaal\Daemons\Http\Message;
+namespace Hathoora\Jaal\Daemons\Http\Upstream;
 
-class RequestUpstreamHeaders
+class Headers
 {
-    // allowed headers that we can pass from client to proxy
-    // keep it lower case
-    public static $arrClientToProxyRequestHeaders = array(
+    //allowed headers that we can pass from client to proxy
+    public static $arrAllowedUpstreamHeaders = array(
         'accept' => 1,
         'accept-language' => 1,
         'accept-charset' => 1,

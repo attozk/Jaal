@@ -2,51 +2,20 @@
 
 namespace Hathoora\Jaal\Daemons\Http\Client;
 
+use Hathoora\Jaal\Daemons\Http\Message\ResponseInterface;
 use Hathoora\Jaal\IO\React\Socket\ConnectionInterface;
-use Hathoora\Jaal\IO\React\SocketClient\ConnectorInterface;
 
-Interface RequestInterface
+Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestInterface
 {
-    /**
-     * Sets a unique request id
-     *
-     * @return self
-     */
-    public function setRequestId();
-
-    /**
-     * Gets the unique request id
-     *
-     * @return mixed
-     */
-    public function getRequestId();
-
-    public function removeHeader($header);
-
-    public function getScheme();
-
-    public function getPort();
-
-    public function getHost();
-
-    public function getPath();
-
-    public function getQuery();
+    public function __construct($method, $url, $headers = array());
 
     /**
      * Sets connection stream to client or proxy
      *
-     * @param ConnectionInterface|ConnectorInterface $stream
+     * @param ConnectionInterface $stream
      * @return self
      */
-    public function setStream($stream);
-
-    /**
-     * Returns the type of stream
-     *
-     * @return string inbound|outbound
-     */
-    public function getStreamType();
+    public function setStream(ConnectionInterface $stream);
 
     /**
      * Returns connection stream socket
@@ -55,27 +24,11 @@ Interface RequestInterface
      */
     public function getStream();
 
-    /**
-     * Sets start time of request in miliseconds
-     *
-     * @param null|int $miliseconds
-     * @return self
-     */
-    public function setStartTime($miliseconds = null);
-
-    /**
-     * Sets execution time of request in miliseconds
-     *
-     * @return self
-     */
-    public function setExecutionTime();
-
-    /**
-     * Gets execution time of request in miliseconds
-     */
-    public function getExecutionTime();
-
     public function setResponse(ResponseInterface $response);
 
+    public function getResponse();
+
     public function send();
+
+    public function error($code, $description = '');
 }
