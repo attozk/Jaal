@@ -15,7 +15,7 @@ use Hathoora\Jaal\IO\React\SocketClient\Stream;
  *
  * @package Hathoora\Jaal\IO\Manager
  */
-class OutboundManager
+class OutboundManager extends IOManager
 {
     /**
      * @var \React\EventLoop\LoopInterface
@@ -31,8 +31,6 @@ class OutboundManager
 
     protected $ips2StreamMapping;
 
-    protected $stats;
-
     /**
      * @param LoopInterface $loop
      * @param Resolver $dns
@@ -44,97 +42,36 @@ class OutboundManager
         $this->dns = $dns;
         $this->protocol = $protocol;
         $this->streams = $this->ips2StreamMapping = array();
-        $this->stats = array(
-            'connections' => 0,
-            'data' => 0,
-        );
     }
 
-    public function add(Stream $stream)
+    public function add($stream)
     {
-        $id = $stream->id;
-        if (!isset($this->streams[$id])) {
-            $this->streams[$id] = array(
-                'stream' => $stream
-            );
-
+        if (!isset($this->streams[$stream->id])) {
             Logger::getInstance()->log(-99,
-                $stream->getRemoteAddress() . ' <' . $id . '> has been added to Outbound Manager ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
+                $stream->getRemoteAddress() . ' <' . $stream->id . '> has been added to Outbound Manager ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
                     'lightPurple'));
-
-            $stream->on('data', function () use ($stream) {
-                $this->setProp($stream, 'lastActivity', Time::millitime());
-            });
-
-            $stream->on('close', function () use ($stream) {
-                $key = $stream->remoteId;
-                $this->removeIp2StreamMapping($key);
-            });
         }
 
-        return $this;
+        return parent::add($stream);
     }
 
-    public function get(Stream $stream)
+    public function remove($stream)
     {
+
         $id = $stream->id;
         if (isset($this->streams[$id])) {
-            return $this->streams[$id];
-        }
-    }
-
-    public function getSteamById($id)
-    {
-
-        if (isset($this->streams[$id])) {
-            return $this->streams[$id]['stream'];
-        }
-    }
-
-    public function remove(Stream $stream)
-    {
-        $id = $stream->id;
-        if (isset($this->streams[$id])) {
-
             Logger::getInstance()->log(-99,
                 $stream->getRemoteAddress() . ' <' . $id . '> has been removed from Outbound Manager after staying connected for ' . Time::millitimeDiff($stream->militime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
                     'lightPurple'));
 
-            unset($this->streams[$id]);
         }
 
-        return $this;
+        $key = $stream->remoteId;
+        $this->removeIp2StreamMapping($key);
+
+        return parent::remove($stream);
     }
 
-    /**
-     * @param Stream $stream
-     * @param $property
-     * @param $value
-     */
-    public function setProp(Stream $stream, $property, $value)
-    {
-        $this->add($stream);
-        $id = $stream->id;
-        $this->streams[$id][$property] = $value;
-    }
-
-    /**
-     * @param Stream $stream
-     * @param $property
-     */
-    public function getProp(Stream $stream, $property)
-    {
-        if (($arr = $this->get($stream)) && isset($arr[$property])) {
-            return $arr[$property];
-        }
-    }
-
-    public function removeProp(Stream $stream, $property)
-    {
-        if (isset($this->streams[$stream->id]) && isset($this->streams[$stream->id][$property])) {
-            unset($this->streams[$stream->id][$property]);
-        }
-    }
 
     public function addIp2StreamMapping($key, Stream $stream)
     {
@@ -174,18 +111,16 @@ class OutboundManager
         $deferred = new Deferred();
         $promise = $deferred->promise();
 
-        if ($stream = $this->getSteamById($id)) {
+        if ($stream = $this->getStreamById($id)) {
 
             $status = $this->getProp($stream, 'status');
             if ($status == 'connected') {
 
-                $hits = $this->getProp($stream, 'hits') + 1;
-                $this->setProp($stream, 'hits', $hits);
-
                 Logger::getInstance()->log(-99,
-                $stream->getRemoteAddress() . ' <' . $id . '> keep alive, hits: ' . $hits . ', idle: '. Time::millitimeDiff($this->getProp($stream, 'lastActivity')) .' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
+                    $stream->getRemoteAddress() . ' <' . $id . '> keep alive, hits: ' . $stream->hits . ', idle: ' . Time::millitimeDiff($this->getProp($stream, 'lastActivity')) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
                     'lightPurple'));
 
+                $stream->hits++;
                 $deferred->resolve($stream);
             } else {
                 $stream = null;

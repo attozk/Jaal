@@ -26,6 +26,7 @@ class Logger implements LoggerInterface
     );
 
     private $levelWeight = 4;
+    private $colors;
 
     private $arrColorsFG = array(
         'black' => '0;30',
@@ -60,11 +61,15 @@ class Logger implements LoggerInterface
     private function __construct()
     {
         $this->levelWeight = -99;
+        $this->colors = false;
     }
 
     // Returns colored string
     public function color($string, $foreground_color = null, $background_color = null)
     {
+        if (!$this->colors)
+            return $string;
+
         $colored_string = "";
 
         // Check if given foreground color found

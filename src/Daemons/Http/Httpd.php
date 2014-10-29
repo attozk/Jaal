@@ -14,6 +14,7 @@ use Hathoora\Jaal\IO\React\Socket\ConnectionInterface;
 use Hathoora\Jaal\IO\React\Socket\Server as SocketServer;
 use Hathoora\Jaal\Logger;
 use Evenement\EventEmitter;
+use Hathoora\Jaal\Util\Time;
 use React\EventLoop\LoopInterface;
 use React\Dns\Resolver\Resolver;
 
@@ -84,6 +85,7 @@ class Httpd extends EventEmitter implements HttpdInterface
             $this->inboundIOManager->add($client);
 
             $client->isAllowed($client)->then(
+
                 function ($client) {
 
                     $client->on('data', function ($data) use ($client) {
@@ -105,17 +107,28 @@ class Httpd extends EventEmitter implements HttpdInterface
     {
         if (!$this->inboundIOManager->getProp($client, 'request')) {
 
+            /** @var $request \Hathoora\Jaal\Daemons\Http\Client\RequestInterface */
             $request = Parser::getClientRequest($data);
             $request->setStartTime()
                 ->setStream($client);
 
+            Logger::getInstance()->log(-50, $request->getHost() . ' ' . $request->getMethod() . ' ' . $request->getUrl() . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'yellow'));
+
+            $client->resource = $request->getUrl();
+
+            if ($client->hits > 1) {
+                Logger::getInstance()->log(-99,
+                    $client->getRemoteAddress() . ' <' . $client->id . '> keep alive, hits: ' . $client->hits . ', idle: ' . Time::millitimeDiff($this->inboundIOManager->getProp($client, 'lastActivity')) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
+                        'lightCyan'));
+            }
+
+            $client->hits++;
             $this->inboundIOManager->setProp($client, 'request', $request);
 
-            Logger::getInstance()->log(-50, $request->getHost() . ' ' . $request->getMethod() . ' ' . $request->getUrl() . ' ' . Logger::getInstance()->color('[' . __METHOD__ .']', 'yellow'));
         } else {
             /** @var $request \Hathoora\Jaal\Daemons\Http\Client\RequestInterface */
             $request = $this->inboundIOManager->getProp($client, 'request');
-            $request->handleData($data);
+            $request->handleData($client, $data);
         }
 
         if ($request->isValid() === true) {
@@ -130,7 +143,7 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     protected function handleRequest(ClientRequestInterface $request)
     {
-        Logger::getInstance()->log(-99, $request->getHost() . ' ' . $request->getMethod() . ' ' . $request->getUrl() . ' ' . Logger::getInstance()->color('[' . __METHOD__ .']', 'yellow'));
+        Logger::getInstance()->log(-99, $request->getHost() . ' ' . $request->getMethod() . ' ' . $request->getUrl() . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'yellow'));
 
         $emitVhostKey = 'client.request.' . $request->getHost() . ':' . $request->getPort();
 
@@ -147,15 +160,14 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     public function proxy($arrVhostConfig, ClientRequestInterface $request)
     {
-        Logger::getInstance()->log(-50, $request->getHost() . ' ' . $request->getMethod() . ' ' . $request->getUrl() . ' ' . Logger::getInstance()->color('[' . __METHOD__ .']', 'yellow'));
+        Logger::getInstance()->log(-50, $request->getHost() . ' ' . $request->getMethod() . ' ' . $request->getUrl() . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'yellow'));
 
         $vhost = VhostFactory::create($arrVhostConfig, $request->getScheme(), $request->getHost(), $request->getPort());
 
         if (!$this->inboundIOManager->getProp($request->getStream(), 'upstreamRequest')) {
             $upstreamRequest = new UpstreamRequest($vhost, $request);
             $upstreamRequest->setBody($request->getBody())->setState(ClientRequestInterface::STATE_PENDING)->send();
-        }
-        // @todo
+        } // @todo
         else if ($upstreamRequest = $this->inboundIOManager->getProp($request->getStream(), 'upstreamRequest')) {
 
         }
@@ -166,6 +178,8 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     public function stats()
     {
-        print_r($this->inboundIOManager->count());
+        return array('inbound' => $this->inboundIOManager->stats(),
+            'outbound' => $this->outboundIOManager->stats()
+        );
     }
 }

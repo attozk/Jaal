@@ -49,7 +49,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
      *
      * @param $data
      */
-    public function handleData($data)
+    public function handleData(ConnectionInterface $stream, $data)
     {
         $this->body .= $data;
 
@@ -73,7 +73,15 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 
     private function prepareResponseHeaders()
     {
-       $this->response->addHeader('Connection', 'Closed');
+        $keepAliveTimeout = Jaal::getInstance()->config->get('httpd.keepalive.timeout');
+        $keepAliveMax = Jaal::getInstance()->config->get('httpd.keepalive.max');
+
+        if ($keepAliveTimeout && $keepAliveMax) {
+            $this->response->addHeader('Connection', 'keep-alive');
+            $this->response->addHeader('Keep-Alive', 'timeout=' . $keepAliveTimeout . ', max=' . $keepAliveMax);
+        } else {
+            $this->response->addHeader('Connection', 'close');
+        }
     }
 
     public function send()
@@ -103,6 +111,10 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 
     private function end()
     {
+        if (!Jaal::getInstance()->config->get('httpd.keepalive.max') && !Jaal::getInstance()->config->get('httpd.keepalive.max')) {
+            $this->stream->end();
+        }
+
         Jaal::getInstance()->getDaemon('httpd')->inboundIOManager->removeProp($this->stream, 'request');
     }
 }

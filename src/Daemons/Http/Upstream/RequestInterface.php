@@ -2,7 +2,7 @@
 
 namespace Hathoora\Jaal\Daemons\Http\Upstream;
 
-use React\Stream\Stream;
+use Hathoora\Jaal\IO\React\SocketClient\Stream;
 use Hathoora\Jaal\Daemons\Http\Message\Response;
 use Hathoora\Jaal\Daemons\Http\Vhost\Vhost;
 use Hathoora\Jaal\Daemons\Http\Client\RequestInterface as ClientRequestInterface;
@@ -29,4 +29,6 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
     public function setResponse(Response $response);
 
     public function send();
+
+    public function handleData(Stream $stream, $data);
 }

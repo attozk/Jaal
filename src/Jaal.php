@@ -46,7 +46,7 @@ class Jaal
     /**
      * @var \Dflydev\DotAccessConfiguration\Configuration
      */
-    protected $config;
+    public $config;
 
     /** @var  \Hathoora\Jaal\Daemons\Http\Server */
     protected $httpd;
@@ -82,6 +82,11 @@ class Jaal
             $socket = new SocketServer($this->loop);
             $this->httpd = new Httpd($this->loop, $socket, $this->dns);
             $this->httpd->listen($port, $ip);
+
+            $this->loop->addPeriodicTimer(5, function () {
+
+                print_r($this->httpd->stats());
+            });
         }
 
         if ($this->config->get('monitoring') && ($port = $this->config->get('monitoring.port')) && ($ip = $this->config->get('monitoring.listen'))) {
@@ -123,9 +128,6 @@ class Jaal
         }
     }
 
-    /**
-     * @param $name http for now
-     */
     public function getDaemon($name)
     {
         $service = null;

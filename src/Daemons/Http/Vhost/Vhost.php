@@ -51,7 +51,6 @@ Class Vhost
     {
         // additional headers passed to proxy (in addition to client's headers)
         $arrProxySetHeaders = isset($arrConfig['proxy_set_header']) && is_array($arrConfig['proxy_set_header']) ? $arrConfig['proxy_set_header'] : array();
-        $arrProxySetHeaders['Connection'] = '';
 
         // add headers to response (i..e sent to the client)
         $arrAddHeaders = isset($arrConfig['add_header']) && is_array($arrConfig['add_header']) ? $arrConfig['add_header'] : array();
@@ -63,9 +62,11 @@ Class Vhost
         }
 
         // keep alive?
-        if (isset($arrConfig['upstreams']) && !empty($arrConfig['upstreams']['keepalive'])) {
+        if (isset($arrConfig['upstreams']) && isset($arrConfig['upstreams']['keepalive']) && !empty($arrConfig['upstreams']['keepalive']['timeout']) && isset($arrConfig['upstreams']['keepalive']['max'])) {
             $arrProxySetHeaders['Connection'] = 'Keep-Alive';
-        }
+            $arrProxySetHeaders['Keep-Alive'] = 'timeout=' . $arrConfig['upstreams']['keepalive']['timeout'] . ', max=' . $arrConfig['upstreams']['keepalive']['max'];
+        } else
+            $arrProxySetHeaders['Connection'] = 'Close';
 
         // the end product of all header's merging
         $arrRequestHeaders = $arrProxySetHeaders;

@@ -24,7 +24,7 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
      */
     public function getStream();
 
-    public function handleData($data);
+    public function handleData(ConnectionInterface $stream, $data);
 
     public function setResponse(ResponseInterface $response);
 

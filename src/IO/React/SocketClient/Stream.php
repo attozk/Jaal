@@ -11,12 +11,15 @@ class Stream extends \React\Stream\Stream {
     public $id;
     public $remoteId;
     public $remoteAddress;
+    public $hits;
+    public $resource; // a unique resource identifier, for http its URL
 
     public function __construct($stream, LoopInterface $loop) {
         parent::__construct($stream, $loop);
         $this->militime = Time::millitime();
         $this->id = stream_socket_get_name($stream, false);
         $this->remoteId = stream_socket_get_name($stream, true);
+        $this->hits = 1;
     }
 
     public function getRemoteAddress()

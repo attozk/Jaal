@@ -11,7 +11,7 @@ use Hathoora\Jaal\Util\Time;
  *
  * @package Hathoora\Jaal\IO\Manager
  */
-class InboundManager
+class InboundManager extends IOManager
 {
     /**
      * @var \React\EventLoop\LoopInterface
@@ -23,92 +23,29 @@ class InboundManager
      */
     protected $protocol;
 
-    /**
-     * @var array storing ConnectionInterface and properties
-     */
-    protected $clients;
-
     public function __construct($loop, $protocol)
     {
         $this->loop = $loop;
         $this->protocol = $protocol;
-        $this->clients = array();
     }
 
-    public function add(ConnectionInterface $client)
+    public function add($stream)
     {
-        $id = $client->id;
-        if (!isset($this->clients[$id])) {
-            $this->clients[$id] = array(
-                'stream' => $client
-            );
-
-
-            Logger::getInstance()->log(-99, $client->getRemoteAddress() . ' <' . $id .'> has been added to Inbound Manager '. Logger::getInstance()->color('[' . __METHOD__ .']', 'lightCyan'));
-
-            $client->on('data', function () use ($client) {
-                $this->setProp($client, 'lastActivity', Time::millitime());
-            });
-
-            $client->on('close', function (ConnectionInterface $client) {
-                $this->remove($client);
-            });
+        if (!isset($this->streams[$stream->id])) {
+            Logger::getInstance()->log(-99, $stream->getRemoteAddress() . ' <' . $stream->id . '> has been added to Inbound Manager ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
         }
 
-        return $this;
+        return parent::add($stream);
     }
 
-    public function get(ConnectionInterface $client)
+    public function remove($stream)
     {
-        $id = $client->id;
-        if (isset($this->clients[$id])) {
-            return $this->clients[$id];
-        }
-    }
 
-    public function remove(ConnectionInterface $client)
-    {
-        $id = $client->id;
-        if (isset($this->clients[$id])) {
-
-            Logger::getInstance()->log(-99, $client->getRemoteAddress() . ' <' . $id .'> has been removed from Inbound Manager after staying connected for ' . Time::millitimeDiff($client->militime)  .' ms '. Logger::getInstance()->color('[' . __METHOD__ .']', 'lightCyan'));
-            unset($this->clients[$id]);
+        $id = $stream->id;
+        if (isset($this->streams[$id])) {
+            Logger::getInstance()->log(-99, $stream->getRemoteAddress() . ' <' . $id . '> has been removed from Inbound Manager after staying connected for ' . Time::millitimeDiff($stream->militime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
         }
 
-        return $this;
-    }
-
-    /**
-     * @param ConnectionInterface $client
-     * @param $property
-     * @param $value
-     */
-    public function setProp(ConnectionInterface $client, $property, $value)
-    {
-        $this->add($client);
-        $id = $client->id;
-        $this->clients[$id][$property] = $value;
-    }
-
-    /**
-     * @param ConnectionInterface $client
-     * @param $property
-     */
-    public function getProp(ConnectionInterface $client, $property)
-    {
-        if (($arr = $this->get($client)) && isset($arr[$property])) {
-            return $arr[$property];
-        }
-    }
-
-    /**
-     * @param ConnectionInterface $client
-     * @param $property
-     */
-    public function removeProp(ConnectionInterface $client, $property)
-    {
-        if (isset($this->clients[$client->id]) && isset($this->clients[$client->id][$property])) {
-            unset($this->clients[$client->id][$property]);
-        }
+        return parent::remove($stream);
     }
 }

@@ -10,12 +10,27 @@ Class Connection extends \React\Socket\Connection implements ConnectionInterface
 {
     public $militime;   // milli time at connect
     public $id;
+    public $remoteId;
+    public $remoteAddress;
+    public $hits;
+    public $resource; // a unique resource identifier, for http its URL
 
     public function __construct($stream, LoopInterface $loop)
     {
         $this->militime = Time::millitime();
         parent::__construct($stream, $loop);
         $this->id = stream_socket_get_name($this->stream, true);
+        $this->remoteId = stream_socket_get_name($stream, false);
+        $this->hits = 1;
+    }
+
+    public function getRemoteAddress()
+    {
+        if (empty($this->remoteAddress)) {
+            $this->remoteAddress = parent::getRemoteAddress();
+        }
+
+        return $this->remoteAddress;
     }
 
     /**

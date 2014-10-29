@@ -2,7 +2,9 @@ httpd:
     port: 800
     listen: 0.0.0.0
     timeout:  60
-    keepAliveTimeout: 10
+    #keepalive:
+    #    timeout: 25
+    #    max: 5
 
 monitoring:
     node: hello
