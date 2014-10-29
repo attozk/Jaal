@@ -17,7 +17,7 @@ class Stream extends \React\Stream\Stream {
     public function __construct($stream, LoopInterface $loop) {
         parent::__construct($stream, $loop);
         $this->militime = Time::millitime();
-        $this->id = stream_socket_get_name($stream, false);
+        $this->id = stream_socket_get_name($stream, false) . '_' . rand(1, 9999);
         $this->remoteId = stream_socket_get_name($stream, true);
         $this->hits = 1;
     }

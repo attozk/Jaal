@@ -19,7 +19,7 @@ Class Connection extends \React\Socket\Connection implements ConnectionInterface
     {
         $this->militime = Time::millitime();
         parent::__construct($stream, $loop);
-        $this->id = stream_socket_get_name($this->stream, true);
+        $this->id = uniqid(stream_socket_get_name($this->stream, true) . '_');
         $this->remoteId = stream_socket_get_name($stream, false);
         $this->hits = 1;
     }

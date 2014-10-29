@@ -1,13 +1,20 @@
 <?php
 
-namespace Hathoora\Jaal\Monitoring;
+namespace Hathoora\Jaal\Daemons\Admin;
 
 use Ratchet\ConnectionInterface;
 use Ratchet\Wamp\Topic;
 use Ratchet\Wamp\WampServerInterface;
+use React\EventLoop\LoopInterface;
 
-class Monitoring implements WampServerInterface
+class WAMP implements WampServerInterface
 {
+    protected $loop;
+
+    public function __construct(LoopInterface $loop)
+    {
+        $this->loop = $loop;
+    }
 
     /**
      * When a new connection is opened it will be passed to this method

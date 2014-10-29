@@ -24,10 +24,9 @@ class Factory
     {
         $uniqueName = $scheme . ':' . $host . ':' . $port;
         $httpd = Jaal::getInstance()->getDaemon('httpd');
-        $outboundIOManager = $httpd->outboundIOManager;
 
         if (!isset(self::$arrVhosts[$uniqueName])) {
-            $vhost = new Vhost($arrConfig, $outboundIOManager);
+            $vhost = new Vhost($arrConfig);
             self::$arrVhosts[$uniqueName] = $vhost;
         } else {
             $vhost = self::$arrVhosts[$uniqueName];

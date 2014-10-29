@@ -47,6 +47,7 @@ class OutboundManager extends IOManager
     public function add($stream)
     {
         if (!isset($this->streams[$stream->id])) {
+
             Logger::getInstance()->log(-99,
                 $stream->getRemoteAddress() . ' <' . $stream->id . '> has been added to Outbound Manager ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
                     'lightPurple'));
@@ -60,8 +61,9 @@ class OutboundManager extends IOManager
 
         $id = $stream->id;
         if (isset($this->streams[$id])) {
+
             Logger::getInstance()->log(-99,
-                $stream->getRemoteAddress() . ' <' . $id . '> has been removed from Outbound Manager after staying connected for ' . Time::millitimeDiff($stream->militime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
+                $stream->getRemoteAddress() . ' <' . $id . '> has been removed from Outbound Manager, connection time: ' . Time::millitimeDiff($stream->militime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
                     'lightPurple'));
 
         }
@@ -92,14 +94,9 @@ class OutboundManager extends IOManager
         }
     }
 
-    /**
-     * @param $ip
-     * @param $port
-     * @param $keepAlive format is -> Seconds:Number of requests
-     * @return \React\Promise\Promise
-     */
-    public function buildConnector($ip, $port, $keepAlive, $timeout = 10)
+    public function buildConnector($ip, $port, $keepalive, $timeout = 10)
     {
+        $stream = null;
         $key = $ip . ':' . $port;
         $id = isset($this->ips2StreamMapping[$key]) ? $this->ips2StreamMapping[$key] : null;
 
@@ -111,39 +108,38 @@ class OutboundManager extends IOManager
         $deferred = new Deferred();
         $promise = $deferred->promise();
 
-        if ($stream = $this->getStreamById($id)) {
+        /*
+        if ($keepalive && ($stream = $this->getStreamById($id))) {
 
             $status = $this->getProp($stream, 'status');
             if ($status == 'connected') {
 
+                $stream->hits++;
                 Logger::getInstance()->log(-99,
                     $stream->getRemoteAddress() . ' <' . $id . '> keep alive, hits: ' . $stream->hits . ', idle: ' . Time::millitimeDiff($this->getProp($stream, 'lastActivity')) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
                     'lightPurple'));
 
-                $stream->hits++;
                 $deferred->resolve($stream);
             } else {
                 $stream = null;
                 $this->removeIp2StreamMapping($key);
             }
-        }
+        }*/
 
         if (!$stream) {
 
             $connector = new Connector($this->loop, $this->dns);
             $connector->create($ip, $port)->then(function (Stream $stream) use ($deferred, $key) {
-
                     $this->addIp2StreamMapping($key, $stream);
                     $this->setProp($stream, 'status', 'connected');
-                    $this->setProp($stream, 'hits', 1);
                     $deferred->resolve($stream);
                 },
                 function ($error) use ($deferred, $key) {
 
-                    $deferred->reject();
                     $this->removeIp2StreamMapping($key);
-
                     Logger::getInstance()->log('NOTICE', 'Unable to connect to remote server: ' . $key);
+
+                    $deferred->reject();
                 });
         }
 

@@ -60,7 +60,7 @@ class Logger implements LoggerInterface
 
     private function __construct()
     {
-        $this->levelWeight = -99;
+        $this->levelWeight = -109;
         $this->colors = false;
     }
 

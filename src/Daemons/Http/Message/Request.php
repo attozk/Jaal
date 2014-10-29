@@ -6,7 +6,7 @@ use Hathoora\Jaal\Util\Time;
 
 class Request extends Message implements RequestInterface
 {
-    protected $id;
+    public $id;
     protected $militime;
     protected $took;        // took milli seconds to execute
     protected $urlParts = array();
@@ -25,21 +25,11 @@ class Request extends Message implements RequestInterface
      *
      * @return self
      */
-    public function setRequestId()
+    protected function setRequestId()
     {
         $this->id = uniqid('Request_');
 
         return $this;
-    }
-
-    /**
-     * Gets the unique request id
-     *
-     * @return mixed
-     */
-    public function getRequestId()
-    {
-        return $this->id;
     }
 
     public function setState($state = null) {

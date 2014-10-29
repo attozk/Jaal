@@ -3,7 +3,7 @@
 namespace Hathoora\Jaal;
 
 use Hathoora\Jaal\Daemons\Http\Httpd;
-use Hathoora\Jaal\Monitoring\Monitoring;
+use Hathoora\Jaal\Daemons\Admin\WAMP;
 use Hathoora\Jaal\IO\React\Socket\Server as SocketServer;
 use Ratchet\Http\HttpServer;
 use Ratchet\Server\IoServer;
@@ -51,8 +51,8 @@ class Jaal
     /** @var  \Hathoora\Jaal\Daemons\Http\Server */
     protected $httpd;
 
-    /** @var  \Hathoora\Jaal\Monitoring\Monitoring */
-    protected $monitoring;
+    /** @var  \Hathoora\Jaal\Daemons\Monitoring\WAMP */
+    protected $admin;
 
     private function __construct()
     {}
@@ -83,15 +83,15 @@ class Jaal
             $this->httpd = new Httpd($this->loop, $socket, $this->dns);
             $this->httpd->listen($port, $ip);
 
-            $this->loop->addPeriodicTimer(5, function () {
-
-                print_r($this->httpd->stats());
-            });
+            #$this->loop->addPeriodicTimer(5, function () {
+            #    print_r($this->httpd->stats());
+            #});
         }
 
-        if ($this->config->get('monitoring') && ($port = $this->config->get('monitoring.port')) && ($ip = $this->config->get('monitoring.listen'))) {
+        if ($this->config->get('admin') && ($port = $this->config->get('admin.port')) && ($ip = $this->config->get('admin.listen'))) {
 
-            $this->monitoring = new Monitoring($this->loop);
+            $this->admin = new WAMP($this->loop);
+            Logger::getInstance()->info('Admin WAMP Server listening on ' . $ip . ':' . $port);
 
             $socket = new SocketServer($this->loop);
             $socket->listen($port, $ip);
@@ -99,7 +99,7 @@ class Jaal
                 new HttpServer(
                     new WsServer(
                         new WampServer(
-                            $this->monitoring
+                            $this->admin
                         )
                     )
                 ),
@@ -132,10 +132,8 @@ class Jaal
     {
         $service = null;
 
-        if ($name == 'httpd') {
-            if (isset($this->$name) && is_object($this->$name))
-                $service = $this->$name;
-        }
+        if (isset($this->$name) && is_object($this->$name))
+            $service = $this->$name;
 
         return $service;
     }

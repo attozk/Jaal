@@ -10,20 +10,6 @@ interface RequestInterface extends MessageInterface
     const STATE_FINALIZING = 3;
     const STATE_DONE = 4;
 
-    /**
-     * Sets a unique request id
-     *
-     * @return self
-     */
-    public function setRequestId();
-
-    /**
-     * Gets the unique request id
-     *
-     * @return mixed
-     */
-    public function getRequestId();
-
     public function setState($state = null);
     public function getState();
     public function getHeaderLines();

@@ -43,7 +43,7 @@ class InboundManager extends IOManager
 
         $id = $stream->id;
         if (isset($this->streams[$id])) {
-            Logger::getInstance()->log(-99, $stream->getRemoteAddress() . ' <' . $id . '> has been removed from Inbound Manager after staying connected for ' . Time::millitimeDiff($stream->militime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
+            Logger::getInstance()->log(-99, $stream->getRemoteAddress() . ' <' . $id . '> has been removed from Inbound Manager, connection time: ' . Time::millitimeDiff($stream->militime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
         }
 
         return parent::remove($stream);

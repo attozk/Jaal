@@ -39,11 +39,9 @@ Class Vhost
 
     /**
      * @param $arrConfig
-     * @param OutboundManager $outboundIOManager
      */
-    public function __construct($arrConfig, OutboundManager $outboundIOManager)
+    public function __construct($arrConfig)
     {
-        $this->outboundIOManager = $outboundIOManager;
         $this->init($arrConfig);
     }
 
@@ -65,8 +63,9 @@ Class Vhost
         if (isset($arrConfig['upstreams']) && isset($arrConfig['upstreams']['keepalive']) && !empty($arrConfig['upstreams']['keepalive']['timeout']) && isset($arrConfig['upstreams']['keepalive']['max'])) {
             $arrProxySetHeaders['Connection'] = 'Keep-Alive';
             $arrProxySetHeaders['Keep-Alive'] = 'timeout=' . $arrConfig['upstreams']['keepalive']['timeout'] . ', max=' . $arrConfig['upstreams']['keepalive']['max'];
-        } else
+        } else {
             $arrProxySetHeaders['Connection'] = 'Close';
+        }
 
         // the end product of all header's merging
         $arrRequestHeaders = $arrProxySetHeaders;
@@ -90,19 +89,22 @@ Class Vhost
         return array_pop($arrUpstreams['servers']);
     }
 
-    /**
-     * @param UpstreamRequest $request
-     * @return \React\Promise\Promise
-     */
-    public function getUpstreamSocket(UpstreamRequest $request)
+    public function getUpstreamConnectorConfig()
     {
         $arrServer = $this->getAvailableUpstreamServer();
         $ip = $arrServer['ip'];
         $port = $arrServer['port'];
-        $keepAlive = $this->config->get('upstreams.keepalive');
+        $keepalive = $this->config->get('upstreams.keepalive.timeout');
+        if ($keepalive)
+            $keepalive .= ':' . $this->config->get('upstreams.keepalive.max');
+
         $timeout = $this->config->get('upstreams.timeout');
 
-        return $this->outboundIOManager->buildConnector($ip, $port, $keepAlive, $timeout);
+        return array(
+            'ip' => $ip,
+            'port' => $port,
+            'keepalive' => $keepalive ? $keepalive : '',
+            'timeout' => $timeout ? $timeout : '');
     }
 
 }

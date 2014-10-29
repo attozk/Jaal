@@ -1,15 +1,17 @@
+jaal:
+  node: hello
+  peers:
+    - 192.168.1.1
+    - 187.76.1.2
+
 httpd:
     port: 800
     listen: 0.0.0.0
     timeout:  60
-    #keepalive:
-    #    timeout: 25
-    #    max: 5
+    keepalive:
+        timeout: 25
+        max: 5
 
-monitoring:
-    node: hello
-    peers:
-        - 192.168.1.1
-        - 187.76.1.2
+admin:
     port: 900
     listen: 0.0.0.0

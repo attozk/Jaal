@@ -4,12 +4,14 @@ namespace Hathoora\Jaal\Daemons\Http\Upstream;
 
 use Hathoora\Jaal\Daemons\Http\Message\Parser;
 use Hathoora\Jaal\Daemons\Http\Message\Response;
+use Hathoora\Jaal\Daemons\Http\Message\ResponseInterface;
 use Hathoora\Jaal\Daemons\Http\Vhost\Vhost;
 use Hathoora\Jaal\Daemons\Http\Client\RequestInterface as ClientRequestInterface;
 use Hathoora\Jaal\IO\React\SocketClient\ConnectorInterface;
 use Hathoora\Jaal\Jaal;
 use Hathoora\Jaal\Logger;
 use Hathoora\Jaal\IO\React\SocketClient\Stream;
+use Hathoora\Jaal\Util\Time;
 
 Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements RequestInterface
 {
@@ -42,6 +44,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         $this->vhost = $vhost;
         $this->clientRequest = $clientRequest;
         $this->prepareHeaders();
+        $this->setState(ClientRequestInterface::STATE_PENDING);
     }
 
     public function getClientRequest()
@@ -95,37 +98,15 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 
     public function send()
     {
-        $this->setState(self::STATE_CONNECTING);
+        $this->setState(self::STATE_RETRIEVING);
 
-        $this->vhost->getUpstreamSocket($this)->then(
-            function (Stream $stream) {
+        $hello = $this->getRawHeaders() . "\r\n\r\n" . $this->getBody();
 
-                $this->setStream($stream);
-                $this->setState(self::STATE_RETRIEVING);
+        Logger::getInstance()->log(-100, "\n" . '----------- Request Write: ' . $this->id . ' -----------' . "\n" .
+            $hello .
+            "\n" . '----------- /Request Write: ' . $this->id . ' -----------' . "\n");
 
-                $hello = $this->getRawHeaders() . "\r\n\r\n" . $this->getBody();
-
-                Logger::getInstance()->log(-100, "\n" . '----------- Request Write: ' . $this->id . ' -----------' . "\n" .
-                    $hello .
-                    "\n" . '----------- /Request Write: ' . $this->id . ' -----------' . "\n");
-
-                if (!$this->vhost->outboundIOManager->getProp($stream, 'request')) {
-
-                    $stream->resource = $this->getUrl();
-                    $this->vhost->outboundIOManager->setProp($stream, 'request', $this);
-                }
-
-                $stream->write($hello);
-
-                $stream->on('data', function ($data) use ($stream) {
-                    $this->handleData($stream, $data);
-                });
-            },
-            // @TODO handle error
-            function ($error) {
-                echo "Unable to connec... \n";
-            }
-        );
+        $this->stream->write($hello);
     }
 
     /**
@@ -133,9 +114,12 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
      */
     public function handleData(Stream $stream, $data)
     {
-        if ($this->vhost->outboundIOManager->getProp($stream, 'request')) {
+        $request = $this;
 
-            $request = $this->vhost->outboundIOManager->getProp($stream, 'request');
+        #if ($this->vhost->outboundIOManager->getProp($stream, 'request')) {
+
+        #$request = $this->vhost->outboundIOManager->getProp($stream, 'request');
+        #$request = $this;
 
             $consumed =& $request->handleUpstreamDataAtts['consumed'];
             $length =& $request->handleUpstreamDataAtts['length'];
@@ -172,7 +156,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
                     // remove header from body as we keep track of bodylength
                     $data = $response->getBody();
                 } else {
-                    $hasError = 400;
+                    $hasError = 401;
                 }
             }
 
@@ -191,34 +175,41 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 
                 if ($isEOM) {
 
-                    if (!$response)
-                        $request->response = Parser::getResponse($buffer);
-                    else
+                    if ($response)
                         $request->response = $response;
+                    else
+                        $request->response = Parser::getResponse($buffer);
 
-                    $request->response->setMethod($this->getMethod());
-                    $request->setExecutionTime();
-
-                    $request->clientRequest->setResponse(clone $this->response);
-                    $request->prepareClientResponseHeader();
-                    $request->clientRequest->send();
-                    $request->setState(self::STATE_DONE);
-                    $request->end();
+                    if ($request->response instanceof ResponseInterface) {
+                        $request->setExecutionTime();
+                        $request->response->setMethod($this->getMethod());
+                        $request->clientRequest->setResponse(clone $this->response);
+                        $request->setState(self::STATE_DONE);
+                        $request->prepareClientResponseHeader();
+                        $request->clientRequest->send();
+                        $request->end();
+                    } else
+                        $hasError = 404;
                 }
-            } else {
-                $request->setState(self::STATE_DONE);
-                $request->clientRequest->error(400);
-                $request->end();
             }
+        #} else {
+        #    $hasError = 500;
+        #}
+
+        if ($hasError) {
+            $request->setState(self::STATE_DONE);
+            $request->clientRequest->error($hasError);
+            $request->end();
         }
     }
 
     private function end()
     {
-        $this->vhost->outboundIOManager->removeProp($this->stream, 'request');
+        Jaal::getInstance()->getDaemon('httpd')->outboundIOManager->removeProp($this->stream, 'request');
         Jaal::getInstance()->getDaemon('httpd')->inboundIOManager->removeProp($this->clientRequest->getStream(), 'upstreamRequest');
 
         if (!$this->vhost->config->get('upstreams.keepalive.max') && !$this->vhost->config->get('upstreams.keepalive.max')) {
+            $this->stream->pause();
             $this->stream->end();
         }
     }

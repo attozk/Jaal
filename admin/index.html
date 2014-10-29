@@ -1,0 +1,101 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Jaal</title>
+    <link rel="stylesheet" href="resources/assets/foundation/css/foundation.css"/>
+    <script src="resources/assets/foundation/js/vendor/modernizr.js"></script>
+
+    <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.2.17/angular.min.js"></script>
+    <script src="http://mine.pk/_assets/_app/mine.pk::minePkBase/common/v1/js/lib/autobahn.min.js?v20141016.c"></script>
+    <script>
+        ab.debug(true, true);
+        session = ab.connect(
+                // The WebSocket URI of the WAMP server
+                'ws://127.0.0.1:900',
+
+                // The onconnect handler
+                function (session) {
+                    // WAMP session established here ..
+                },
+
+                // The onhangup handler
+                function (code, reason, detail) {
+                    // WAMP session closed here ..
+                },
+
+                // The session options
+                {
+                    'maxRetries': 60,
+                    'retryDelay': 2000
+                }
+        );
+    </script>
+    <style>
+        /* meyerweb CSS reset v2.0
+        ==================================================*/
+        html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre, a, abbr, acronym, address, big, cite, code, del, dfn, em, img, ins, kbd, q, s, samp, small, strike, strong, sub, sup, tt, var, b, u, i, center, dl, dt, dd, ol, ul, li, fieldset, form, label, legend, table, caption, tbody, tfoot, thead, tr, th, td,
+        article, aside, canvas, details, embed, figure, figcaption, footer, header, menu, nav, output, ruby, section, summary, time, mark, audio, video {
+            margin: 0;
+            padding: 0;
+            border: 0;
+            font-size: 100%;
+            font: inherit;
+            vertical-align: baseline;
+        }
+
+        /* HTML5 display-role reset for older browsers */
+        article, aside, details, figcaption, figure, footer, header, menu, nav, section {
+            display: block;
+        }
+
+        body {
+            line-height: 1;
+        }
+
+        ol, ul {
+            list-style: none;
+        }
+
+        blockquote, q {
+            quotes: none;
+        }
+
+        blockquote:before, blockquote:after, q:before, q:after {
+            content: '';
+            content: none;
+        }
+
+        table {
+            border-collapse: collapse;
+            border-spacing: 0;
+        }
+
+        header {
+            height: 60px;
+            background: #ccc;
+        }
+
+        footer {
+            position: fixed;
+            bottom: 0px;
+            height: 20px;
+            background: darkgreen;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+
+</header>
+<article>
+
+</article>
+<footer>
+
+</footer>
+</body>
+</html>
