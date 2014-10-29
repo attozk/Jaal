@@ -42,7 +42,27 @@ class Request extends Message implements RequestInterface
         return $this->id;
     }
 
-    public function setState($state) {
+    public function setState($state = null) {
+
+        if (!$state) {
+
+            $state = self::STATE_PENDING;
+            $EOM = $this->getEOMType();
+
+            if (!$EOM && $this->method == 'GET' && count($this->headers))
+                $state = self::STATE_DONE;
+
+            // content length
+            else if ($EOM == 'length' && $this->method != 'GET' && strlen($this->body) == $this->getSize()) {
+                $state = self::STATE_DONE;
+            }
+
+            // @TODO handle chunked
+            else if ($EOM == 'chunked') {
+
+            }
+        }
+
         $this->state = $state;
 
         return $this;
@@ -78,7 +98,6 @@ class Request extends Message implements RequestInterface
         . strtoupper(str_replace('https', 'http', $this->getScheme()))
         . '/' . $protocolVersion . "\r\n" . implode("\r\n", $this->getHeaderLines());
     }
-
 
     /**
      * Sets start time of request in miliseconds
@@ -155,8 +174,8 @@ class Request extends Message implements RequestInterface
         #$pass     = isset($parsed_url['pass']) ? ':' . $parsed_url['pass']  : '';
         #$pass     = ($user || $pass) ? "$pass@" : '';
         $path     = $this->getPath();
-        $query    = isset($this->urlParts['query']) ? '?' . $this->urlParts['query'] : '';
-        $fragment = isset($this->urlParts['fragment']) ? '#' . $this->urlParts['fragment'] : '';
+        $query    = !empty($this->urlParts['query']) ? '?' . $this->urlParts['query'] : '';
+        $fragment = !empty($this->urlParts['fragment']) ? '#' . $this->urlParts['fragment'] : '';
 
         if ($scheme == 'http' && $port != 80)
             $port = ':' . $port;
@@ -320,5 +339,15 @@ class Request extends Message implements RequestInterface
         $this->protocolVersion = $protocol;
 
         return $this;
+    }
+
+    public function isValid()
+    {
+        $valid = true;
+
+        if ($this->body && !$this->hasHeader('Content-Length'))
+            $valid = 400;
+
+        return $valid;
     }
 }

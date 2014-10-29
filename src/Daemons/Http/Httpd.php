@@ -50,10 +50,6 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     private $arrRequests = array();
 
-    private $arrConfig = array(
-        'maxConnectionsPerIP' => 10,             // maximum concurrent connections per IP
-    );
-
     /**
      * @param LoopInterface $loop
      * @param SocketServer $socket
@@ -84,26 +80,18 @@ class Httpd extends EventEmitter implements HttpdInterface
     private function init()
     {
         $this->socket->on('connection', function (ConnectionInterface $client) {
+
             $this->inboundIOManager->add($client);
 
             $client->isAllowed($client)->then(
                 function ($client) {
 
-                    $client->on('close', function (ConnectionInterface $client) {
-                        $this->handleClose($client);
-                    });
-
-                    $client->on('error', function (ConnectionInterface $client) {
-                        $this->handleError($client);
-                    });
-
                     $client->on('data', function ($data) use ($client) {
                         $this->handleData($client, $data);
                     });
                 },
-                // @TODO error handle, emit somthing here?
                 function ($error) use ($client) {
-                    $this->inboundIOManager->end($client);
+                    $this->handleClose($client);
                 }
             );
         });
@@ -115,14 +103,24 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     protected function handleData(ConnectionInterface $client, $data)
     {
-        /** @var $request \Hathoora\Jaal\Daemons\Http\Client\RequestInterface */
-        $request = Parser::getClientRequest($data);
-        $request->setStartTime()
-                ->setStream($client)
-                ->setState('Ready');
+        if (!$this->inboundIOManager->getProp($client, 'request')) {
 
-        Logger::getInstance()->debug($request->getMethod() . ' ' . $request->getUrl());
-        $this->handleRequest($request);
+            $request = Parser::getClientRequest($data);
+            $request->setStartTime()
+                ->setStream($client);
+
+            $this->inboundIOManager->setProp($client, 'request', $request);
+
+            Logger::getInstance()->log(-50, $request->getHost() . ' ' . $request->getMethod() . ' ' . $request->getUrl() . ' ' . Logger::getInstance()->color('[' . __METHOD__ .']', 'yellow'));
+        } else {
+            /** @var $request \Hathoora\Jaal\Daemons\Http\Client\RequestInterface */
+            $request = $this->inboundIOManager->getProp($client, 'request');
+            $request->handleData($data);
+        }
+
+        if ($request->isValid() === true) {
+            $this->handleRequest($request);
+        }
     }
 
     /**
@@ -132,6 +130,8 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     protected function handleRequest(ClientRequestInterface $request)
     {
+        Logger::getInstance()->log(-99, $request->getHost() . ' ' . $request->getMethod() . ' ' . $request->getUrl() . ' ' . Logger::getInstance()->color('[' . __METHOD__ .']', 'yellow'));
+
         $emitVhostKey = 'client.request.' . $request->getHost() . ':' . $request->getPort();
 
         if (count($this->listeners($emitVhostKey))) {
@@ -142,32 +142,23 @@ class Httpd extends EventEmitter implements HttpdInterface
     }
 
     /**
-     * @emit client.error
-     * @param ConnectionInterface $client
-     */
-    protected function handleError(ConnectionInterface $client)
-    {
-        $this->emit('client.error', [$client]);
-    }
-
-    /**
-     * @emit client.close
-     * @param ConnectionInterface $client
-     */
-    protected function handleClose(ConnectionInterface $client)
-    {
-        $this->emit('client.close', [$client]);
-        $this->inboundIOManager->end($client);
-    }
-
-    /**
      * @param array $arrVhostConfig
      * @param ClientRequestInterface $request
      */
     public function proxy($arrVhostConfig, ClientRequestInterface $request)
     {
+        Logger::getInstance()->log(-50, $request->getHost() . ' ' . $request->getMethod() . ' ' . $request->getUrl() . ' ' . Logger::getInstance()->color('[' . __METHOD__ .']', 'yellow'));
+
         $vhost = VhostFactory::create($arrVhostConfig, $request->getScheme(), $request->getHost(), $request->getPort());
-        (new UpstreamRequest($vhost, $request))->setBody($request->getBody())->setState('Pending')->send();
+
+        if (!$this->inboundIOManager->getProp($request->getStream(), 'upstreamRequest')) {
+            $upstreamRequest = new UpstreamRequest($vhost, $request);
+            $upstreamRequest->setBody($request->getBody())->setState(ClientRequestInterface::STATE_PENDING)->send();
+        }
+        // @todo
+        else if ($upstreamRequest = $this->inboundIOManager->getProp($request->getStream(), 'upstreamRequest')) {
+
+        }
     }
 
     /**

@@ -11,7 +11,8 @@ abstract class Message implements MessageInterface
     protected $headers = array();
     protected $body = '';
 
-    private function normalizeHader($header) {
+    private function normalizeHader($header)
+    {
         return strtolower($header);
     }
 
@@ -19,7 +20,7 @@ abstract class Message implements MessageInterface
     {
         $header = $this->normalizeHader($header);
 
-        $this->headers[$header] =  $value;
+        $this->headers[$header] = $value;
 
         return $this;
     }
@@ -78,7 +79,6 @@ abstract class Message implements MessageInterface
         return $this;
     }
 
-
     public function setBody($body)
     {
         $this->body = $body;
@@ -89,5 +89,31 @@ abstract class Message implements MessageInterface
     public function getBody()
     {
         return $this->body;
+    }
+
+    public function getEOMType()
+    {
+        $method = null;
+
+        if ($this->hasHeader('Content-Length')) {
+            $method = 'length';
+        } else {
+            if ($this->hasHeader('Transfer-Encoding') && preg_match('/chunked/', $this->getHeader('Transfer-Encoding'))) {
+                $method = 'chunked';
+            }
+        }
+
+        return $method;
+    }
+
+    public function getSize()
+    {
+        if ($this->hasHeader('Content-Length')) {
+            $size = $this->getHeader('Content-Length');
+        } else {
+            $size = strlen($this->body);
+        }
+
+        return $size;
     }
 }

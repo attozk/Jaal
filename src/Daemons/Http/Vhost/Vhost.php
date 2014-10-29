@@ -101,7 +101,7 @@ Class Vhost
         $keepAlive = $this->config->get('upstreams.keepalive');
         $timeout = $this->config->get('upstreams.timeout');
 
-        return $this->outboundIOManager->buildKeepAliveConnector($ip, $port, $keepAlive, $timeout);
+        return $this->outboundIOManager->buildConnector($ip, $port, $keepAlive, $timeout);
     }
 
 }

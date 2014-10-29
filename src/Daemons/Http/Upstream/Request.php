@@ -7,6 +7,7 @@ use Hathoora\Jaal\Daemons\Http\Message\Response;
 use Hathoora\Jaal\Daemons\Http\Vhost\Vhost;
 use Hathoora\Jaal\Daemons\Http\Client\RequestInterface as ClientRequestInterface;
 use Hathoora\Jaal\IO\React\SocketClient\ConnectorInterface;
+use Hathoora\Jaal\Jaal;
 use Hathoora\Jaal\Logger;
 use React\Stream\Stream;
 
@@ -94,18 +95,19 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 
     public function send()
     {
-        $request = $this;
+        $this->setState(self::STATE_CONNECTING);
 
         $this->vhost->getUpstreamSocket($this)->then(
-            function (Stream $stream) use ($request) {
+            function (Stream $stream) {
 
                 $this->setStream($stream);
+                $this->setState(self::STATE_RETRIEVING);
 
                 $hello = $this->getRawHeaders() . "\r\n\r\n" . $this->getBody();
 
-                Logger::getInstance()->debug("\n" . '----------- Request Write: ' . $request->id . ' -----------' . "\n" .
+                Logger::getInstance()->log(-100, "\n" . '----------- Request Write: ' . $this->id . ' -----------' . "\n" .
                     $hello .
-                    "\n" . '----------- /Request Write: ' . $request->id . ' -----------' . "\n");
+                    "\n" . '----------- /Request Write: ' . $this->id . ' -----------' . "\n");
 
                 $stream->write($hello);
 
@@ -134,7 +136,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 
         if (!$this->handleUpstreamDataAtts['methodEOM']) {
 
-            Logger::getInstance()->debug("\n" . '----------- Request Read: ' . $this->id . ' -----------' . "\n" .
+            Logger::getInstance()->log(-100, "\n" . '----------- Request Read: ' . $this->id . ' -----------' . "\n" .
                 $data .
                 "\n" . '----------- /Request Read: ' . $this->id . ' -----------' . "\n");
 
@@ -184,15 +186,22 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
                 $this->response->setMethod($this->getMethod());
                 $this->setExecutionTime();
 
-                $this->getClientRequest()->setResponse(clone $this->response);
+                $this->clientRequest->setResponse(clone $this->response);
                 $this->prepareClientResponseHeader();
-                $this->getClientRequest()->send();
-                $this->setState('Finished');
+                $this->clientRequest->send();
+                $this->setState(self::STATE_DONE);
                 $this->stream->end();
+                $this->end();
             }
         } else {
             $this->getClientRequest()->getStream()->end();
+            $this->end();
         }
+    }
+
+    private function end()
+    {
+        Jaal::getInstance()->getDaemon('httpd')->inboundIOManager->removeProp($this->clientRequest->getStream(), 'upstreamRequest');
     }
 
     /**

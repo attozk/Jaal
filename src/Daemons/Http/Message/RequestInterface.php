@@ -4,6 +4,12 @@ namespace Hathoora\Jaal\Daemons\Http\Message;
 
 interface RequestInterface extends MessageInterface
 {
+    const STATE_PENDING = 0;
+    const STATE_CONNECTING = 1;
+    const STATE_RETRIEVING = 2;
+    const STATE_FINALIZING = 3;
+    const STATE_DONE = 4;
+
     /**
      * Sets a unique request id
      *
@@ -18,7 +24,7 @@ interface RequestInterface extends MessageInterface
      */
     public function getRequestId();
 
-    public function setState($state);
+    public function setState($state = null);
     public function getState();
     public function getHeaderLines();
     public function getRawHeaders();
@@ -159,4 +165,6 @@ interface RequestInterface extends MessageInterface
      * @return self
      */
     public function setProtocolVersion($protocol);
+
+    public function isValid();
 }

@@ -17,4 +17,6 @@ interface MessageInterface
     public function removeHeader($header);
     public function setBody($body);
     public function getBody();
+    public function getSize();
+    public function getEOMType();
 }

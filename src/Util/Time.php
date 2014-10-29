@@ -17,4 +17,12 @@ class Time
         // in case of "overflow" (PHP converts it to a double)
         return sprintf('%d%03d', $comps[1], $comps[0] * 1000);
     }
+
+    public static function millitimeDiff($start, $now = null) {
+
+        if (!$now)
+            $now = self::millitime();
+
+        return ($now - $start);
+    }
 }

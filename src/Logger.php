@@ -43,7 +43,8 @@ class Logger implements LoggerInterface
         'brown' => '0;33',
         'yellow' => '1;33',
         'lightGray' => '0;37',
-        'white' => '1;37' );
+        'white' => '1;37'
+    );
 
     private $arrColorsBG = array(
         'black' => '40',
@@ -53,11 +54,32 @@ class Logger implements LoggerInterface
         'blue' => '44',
         'magenta' => '45',
         'cyan' => '46',
-        'light_gray' => '47');
+        'light_gray' => '47'
+    );
 
     private function __construct()
     {
-        $this->levelWeight = 0;
+        $this->levelWeight = -99;
+    }
+
+    // Returns colored string
+    public function color($string, $foreground_color = null, $background_color = null)
+    {
+        $colored_string = "";
+
+        // Check if given foreground color found
+        if (isset($this->arrColorsFG[$foreground_color])) {
+            $colored_string .= "\033[" . $this->arrColorsFG[$foreground_color] . "m";
+        }
+        // Check if given background color found
+        if (isset($this->arrColorsBG[$background_color])) {
+            $colored_string .= "\033[" . $this->arrColorsBG[$background_color] . "m";
+        }
+
+        // Add string and end coloring
+        $colored_string .= $string . "\033[0m";
+
+        return $colored_string;
     }
 
     /**
@@ -177,8 +199,9 @@ class Logger implements LoggerInterface
      */
     public function log($level, $message, array $context = array())
     {
-        if ((is_numeric($level) && $level >= $this->levelWeight) || ($this->levelWeights[$level] >= $this->levelWeight))
-            echo '[' . $level .'] ' . $message . "\n";
+        if ((is_numeric($level) && $level >= $this->levelWeight) || (isset($this->levelWeights[$level]) && $this->levelWeights[$level] >= $this->levelWeight)) {
+            echo '[' . $level . '] ' . $message . "\n";
+        }
     }
 
     /**

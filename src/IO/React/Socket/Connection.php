@@ -9,11 +9,13 @@ use React\Promise\Deferred;
 Class Connection extends \React\Socket\Connection implements ConnectionInterface
 {
     public $militime;   // milli time at connect
+    public $id;
 
     public function __construct($stream, LoopInterface $loop)
     {
         $this->militime = Time::millitime();
         parent::__construct($stream, $loop);
+        $this->id = stream_socket_get_name($this->stream, true);
     }
 
     /**

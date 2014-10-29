@@ -46,6 +46,10 @@ class Parser
         return $parsed;
     }
 
+    /**
+     * @param $message
+     * @return ClientRequest
+     */
     public static function getClientRequest($message)
     {
         if (!($parsed = self::parseRequest($message))) {
@@ -59,7 +63,8 @@ class Parser
             ->setPath($parsed['request_url']['path'])
             ->setPort($parsed['request_url']['port'])
             ->setQuery($parsed['request_url']['query'])
-            ->setBody($parsed['body']);
+            ->setBody($parsed['body'])
+            ->setState();
     }
 
     /**
