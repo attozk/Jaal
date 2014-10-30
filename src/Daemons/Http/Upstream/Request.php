@@ -186,8 +186,8 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
                         $request->clientRequest->setResponse(clone $this->response);
                         $request->setState(self::STATE_DONE);
                         $request->prepareClientResponseHeader();
-                        $request->clientRequest->send();
                         $request->end();
+                        $request->clientRequest->reply();
                     } else
                         $hasError = 404;
                 }
@@ -197,21 +197,29 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         #}
 
         if ($hasError) {
-            $request->setState(self::STATE_DONE);
-            $request->clientRequest->error($hasError);
+            $request->setState(self::STATE_ERROR);
             $request->end();
+            $request->clientRequest->error($hasError);
         }
+    }
+
+    public function reply()
+    {
+
     }
 
     private function end()
     {
+        Logger::getInstance()->log(-99, 'UPSTREAM RESPONSE ('. $this->state .') ' . Logger::getInstance()->color($this->getUrl(), 'red') . ' using remote stream: '. Logger::getInstance()->color($this->stream->id, 'green'));
         Jaal::getInstance()->getDaemon('httpd')->outboundIOManager->removeProp($this->stream, 'request');
-        Jaal::getInstance()->getDaemon('httpd')->inboundIOManager->removeProp($this->clientRequest->getStream(), 'upstreamRequest');
-
         if (!$this->vhost->config->get('upstreams.keepalive.max') && !$this->vhost->config->get('upstreams.keepalive.max')) {
-            $this->stream->pause();
             $this->stream->end();
         }
+    }
+
+    public function error($code, $description = '')
+    {
+
     }
 
     /**

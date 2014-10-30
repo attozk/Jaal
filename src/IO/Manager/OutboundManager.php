@@ -49,7 +49,7 @@ class OutboundManager extends IOManager
         if (!isset($this->streams[$stream->id])) {
 
             Logger::getInstance()->log(-99,
-                $stream->getRemoteAddress() . ' <' . $stream->id . '> has been added to Outbound Manager ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
+                Logger::getInstance()->color($stream->remoteId, 'purple'). ' / '. Logger::getInstance()->color($stream->id, 'green') .' has been added to Outbound Manager, hits: ' . $stream->hits .', connection time: ' . Time::millitimeDiff($stream->militime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
                     'lightPurple'));
         }
 
@@ -58,18 +58,15 @@ class OutboundManager extends IOManager
 
     public function remove($stream)
     {
-
         $id = $stream->id;
+        $key = $stream->remoteId;
+
         if (isset($this->streams[$id])) {
 
             Logger::getInstance()->log(-99,
-                $stream->getRemoteAddress() . ' <' . $id . '> has been removed from Outbound Manager, connection time: ' . Time::millitimeDiff($stream->militime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
+                Logger::getInstance()->color($stream->remoteId, 'purple'). ' / '. Logger::getInstance()->color($stream->id, 'green') .' has been removed from Outbound Manager, hits: ' . $stream->hits .', connection time: ' . Time::millitimeDiff($stream->militime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
                     'lightPurple'));
-
         }
-
-        $key = $stream->remoteId;
-        $this->removeIp2StreamMapping($key);
 
         return parent::remove($stream);
     }
@@ -78,19 +75,12 @@ class OutboundManager extends IOManager
     public function addIp2StreamMapping($key, Stream $stream)
     {
         $this->ips2StreamMapping[$key] = $stream->id;
-        $this->add($stream);
     }
 
     public function removeIp2StreamMapping($key)
     {
         if (isset($this->ips2StreamMapping[$key])) {
-            $id = $this->ips2StreamMapping[$key];
-
             unset($this->ips2StreamMapping[$key]);
-
-            if (isset($this->streams[$id])) {
-                unset($this->streams[$id]);
-            }
         }
     }
 
@@ -130,13 +120,13 @@ class OutboundManager extends IOManager
 
             $connector = new Connector($this->loop, $this->dns);
             $connector->create($ip, $port)->then(function (Stream $stream) use ($deferred, $key) {
-                    $this->addIp2StreamMapping($key, $stream);
+                    //$this->addIp2StreamMapping($key, $stream);
                     $this->setProp($stream, 'status', 'connected');
                     $deferred->resolve($stream);
                 },
                 function ($error) use ($deferred, $key) {
 
-                    $this->removeIp2StreamMapping($key);
+                    //$this->removeIp2StreamMapping($key);
                     Logger::getInstance()->log('NOTICE', 'Unable to connect to remote server: ' . $key);
 
                     $deferred->reject();

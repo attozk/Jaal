@@ -83,7 +83,7 @@ class Jaal
             $this->httpd = new Httpd($this->loop, $socket, $this->dns);
             $this->httpd->listen($port, $ip);
 
-            #$this->loop->addPeriodicTimer(5, function () {
+            #$this->loop->addPeriodicTimer(70, function () {
             #    print_r($this->httpd->stats());
             #});
         }

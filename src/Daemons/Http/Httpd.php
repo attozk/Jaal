@@ -103,6 +103,8 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     protected function handleClientRequestData(ConnectionInterface $client, $data)
     {
+        $request = null;
+
         if (!$this->inboundIOManager->getProp($client, 'request')) {
 
             /** @var $request \Hathoora\Jaal\Daemons\Http\Client\RequestInterface */
@@ -110,28 +112,33 @@ class Httpd extends EventEmitter implements HttpdInterface
             $request->setStartTime()
                 ->setStream($client);
 
-            Logger::getInstance()->log(-50, $request->getHost() . ' ' . $request->getMethod() . ' ' . $request->getUrl() . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'yellow'));
+            Logger::getInstance()->log(-50,
+                'REQUEST ' . $request->getMethod() . ' ' . Logger::getInstance()->color($request->getUrl(),
+                    'red') . ' ' . $request->getHost() . ' using stream: ' . Logger::getInstance()->color($client->id,
+                    'green') . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
+                    'yellow'));
 
             $client->resource = $request->getUrl();
+            $client->hits++;
 
             if ($client->hits > 1) {
                 Logger::getInstance()->log(-99,
-                    $client->getRemoteAddress() . ' <' . $client->id . '> keep alive, hits: ' . $client->hits . ', idle: ' . Time::millitimeDiff($this->inboundIOManager->getProp($client, 'lastActivity')) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
+                    Logger::getInstance()->color($client->id, 'green') . ' keep-alive requested '. $request->getUrl() .', hits: ' . $client->hits . ', idle: ' . Time::millitimeDiff($this->inboundIOManager->getProp($client,
+                        'lastActivity')) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
                         'lightCyan'));
             }
 
-            $client->hits++;
             $this->inboundIOManager->setProp($client, 'request', $request);
 
         } else {
             /** @var $request \Hathoora\Jaal\Daemons\Http\Client\RequestInterface */
-            $request = $this->inboundIOManager->getProp($client, 'request');
-            $request->handleData($client, $data);
+            if ($request = $request = $this->inboundIOManager->getProp($client, 'request')) {
+                $request->handleData($client, $data);
+            }
         }
 
-        if ($request->isValid() === true) {
 
-            Logger::getInstance()->log(-99, $request->getHost() . ' ' . $request->getMethod() . ' ' . $request->getUrl() . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'yellow'));
+        if ($request && $request->isValid() === true) {
 
             $emitVhostKey = 'client.request.' . $request->getHost() . ':' . $request->getPort();
 
@@ -141,13 +148,26 @@ class Httpd extends EventEmitter implements HttpdInterface
                 $this->emit('client.request' . ':' . $request->getPort(), [$request]);
             }
         }
+
+        if (!$request) {
+
+            Logger::getInstance()->log('ERROR', 'Unable to handle client request.');
+            $client->end();
+        }
     }
 
     public function proxy($arrVhostConfig, ClientRequestInterface $clientRequest)
     {
-        Logger::getInstance()->log(-50, $clientRequest->getHost() . ' ' . $clientRequest->getMethod() . ' ' . $clientRequest->getUrl() . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'yellow'));
+        static $i = 0;
+        $i++;
+        Logger::getInstance()->log(-50,
+            'PROXY ' . $clientRequest->getMethod() . ' ' . Logger::getInstance()->color($clientRequest->getUrl(),
+                'red') . ' ' . $clientRequest->getHost() . ' using stream: ' . Logger::getInstance()->color($clientRequest->getStream()->id,
+                'green') . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
+                'yellow'));
 
-        $vhost = VhostFactory::create($arrVhostConfig, $clientRequest->getScheme(), $clientRequest->getHost(), $clientRequest->getPort());
+        $vhost = VhostFactory::create($arrVhostConfig, $clientRequest->getScheme(), $clientRequest->getHost(),
+            $clientRequest->getPort());
         $arrUpstreamConfig = $vhost->getUpstreamConnectorConfig();
 
         $ip = $arrUpstreamConfig['ip'];
@@ -160,7 +180,7 @@ class Httpd extends EventEmitter implements HttpdInterface
 
         $this->outboundIOManager->buildConnector($ip, $port, $keepalive, $timeout)->then(
 
-            function (Stream $stream) use ($upstreamRequest) {
+            function (Stream $stream) use ($upstreamRequest, $i) {
 
                 $this->outboundIOManager->setProp($stream, 'request', $upstreamRequest);
                 $stream->hits++;
@@ -171,9 +191,18 @@ class Httpd extends EventEmitter implements HttpdInterface
                     ->setState(RequestInterface::STATE_CONNECTING)
                     ->send();
 
-                $stream->on('data', function ($data) use ($stream) {
+                $stream->on('data', function ($data) use ($stream, $upstreamRequest) {
+
+                    #if (!$this->outboundIOManager->getProp($stream, 'request'))
+                    #{
+                    #    $this->outboundIOManager->setProp($stream, 'request', $upstreamRequest);
+                    #}
+
                     $this->handleUpstreamRequestData($stream, $data);
                 });
+            }, function($error) {
+
+                die("ERROR buildConnector....");
             }
         );
     }
@@ -184,7 +213,16 @@ class Httpd extends EventEmitter implements HttpdInterface
         if ($request = $this->outboundIOManager->getProp($stream, 'request')) {
             $request->handleData($stream, $data);
         } else {
-            $request->handleData($stream, $data);
+
+            die('handleUpstreamRequestData error');
+            //echo "---------------------------------------\n". $data . "---------------------------------------\n";
+
+            Logger::getInstance()->log(-99,
+                'ERROR  handleUpstreamRequestData stream: ' . Logger::getInstance()->color($stream->id,
+                    'green') . ' has no request ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
+                    'yellow'));
+            $stream->end();
+
         }
     }
 
@@ -193,7 +231,8 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     public function stats()
     {
-        return array('inbound' => $this->inboundIOManager->stats(),
+        return array(
+            'inbound' => $this->inboundIOManager->stats(),
             'outbound' => $this->outboundIOManager->stats()
         );
     }

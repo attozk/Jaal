@@ -25,6 +25,7 @@ abstract class IOManager
     {
         $id = $stream->id;
         if (!isset($this->streams[$id])) {
+
             $this->streams[$id] = array(
                 'stream' => $stream,
                 'lastActivity' => Time::millitime()

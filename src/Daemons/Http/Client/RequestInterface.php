@@ -30,7 +30,7 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
 
     public function getResponse();
 
-    public function send();
+    public function reply();
 
     public function error($code, $description = '');
 }

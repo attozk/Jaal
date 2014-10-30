@@ -7,8 +7,9 @@ interface RequestInterface extends MessageInterface
     const STATE_PENDING = 0;
     const STATE_CONNECTING = 1;
     const STATE_RETRIEVING = 2;
-    const STATE_FINALIZING = 3;
-    const STATE_DONE = 4;
+    const STATE_FINALIZING = 5;
+    const STATE_ERROR = 7;
+    const STATE_DONE = 9;
 
     public function setState($state = null);
     public function getState();

@@ -6,6 +6,7 @@ use Hathoora\Jaal\Daemons\Http\Message\Response;
 use Hathoora\Jaal\Daemons\Http\Message\ResponseInterface;
 use Hathoora\Jaal\IO\React\Socket\ConnectionInterface;
 use Hathoora\Jaal\Jaal;
+use Hathoora\Jaal\Logger;
 
 Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements RequestInterface
 {
@@ -84,7 +85,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         }
     }
 
-    public function send()
+    public function reply()
     {
         $this->prepareResponseHeaders();
         $this->setState(self::STATE_DONE);
@@ -94,7 +95,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 
     public function error($code, $description = '')
     {
-        $this->setState(self::STATE_DONE);
+        $this->setState(self::STATE_ERROR);
 
         if (!$this->response)
             $this->response = new Response($code);
@@ -111,6 +112,9 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 
     private function end()
     {
+        Logger::getInstance()->log(-99, 'REPLY ('. $this->state .') ' . Logger::getInstance()->color($this->getUrl(), 'red') . ' using stream: '. Logger::getInstance()->color($this->stream->id, 'green'));
+
+
         if (!Jaal::getInstance()->config->get('httpd.keepalive.max') && !Jaal::getInstance()->config->get('httpd.keepalive.max')) {
             $this->stream->end();
         }
