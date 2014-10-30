@@ -60,13 +60,11 @@ class Logger implements LoggerInterface
 
     private function __construct()
     {
-        $this->levelWeight = 4;
-
         $level = Jaal::getInstance()->config->get('jaal.debug.level');
 
         if (is_numeric($level))
             $this->levelWeight = $level;
-        else if (isset($this->levelWeights[$level]))
+        else if (($level = strtoupper($level)) && isset($this->levelWeights[$level]))
             $this->levelWeight = $this->levelWeights[$level];
 
         $this->colors = Jaal::getInstance()->config->get('jaal.debug.colors');

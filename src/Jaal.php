@@ -10,7 +10,9 @@ use Ratchet\Server\IoServer;
 use Ratchet\Wamp\WampServer;
 use Ratchet\WebSocket\WsServer;
 use React\Dns\Resolver\Resolver;
+use React\EventLoop\Factory as LoopFactory;
 use React\EventLoop\LoopInterface;
+use React\Dns\Resolver\Factory as DnsFactory;
 use Dflydev\DotAccessConfiguration\YamlFileConfigurationBuilder;
 
 class Jaal
@@ -23,12 +25,12 @@ class Jaal
     /**
      * @var \React\EventLoop\LoopInterface
      */
-    protected $loop;
+    public $loop;
 
     /**
      * @var \React\Dns\Resolver\Resolver
      */
-    protected $dns;
+    public $dns;
 
     /**
      * Path to config file
@@ -51,19 +53,30 @@ class Jaal
     /** @var  \Hathoora\Jaal\Daemons\Http\Server */
     protected $httpd;
 
-    /** @var  \Hathoora\Jaal\Daemons\Monitoring\WAMP */
+    /** @var  \Hathoora\Jaal\Daemons\Admin\WAMP */
     protected $admin;
 
     private function __construct()
     {}
 
-    public function setup(LoopInterface $loop, Resolver $dns)
+    public static function execute($docopt)
+    {
+
+        $loop = LoopFactory::create();
+        self::getInstance()->setup($loop);
+        $loop->run();
+    }
+
+    public function setup(LoopInterface $loop)
     {
         $this->loop = $loop;
-        $this->dns = $dns;
         $this->configFilePath = realpath(__DIR__ .'/../conf.yml');
         $this->confDPath = realpath(__DIR__ .'/../conf.d/');
         $this->initConfig();
+
+        $dnsResolverFactory = new DnsFactory();
+        $this->dns = $dnsResolverFactory->createCached($this->config->get('jaal.resolver'), $loop);
+
         $this->initDaemons();
         $this->initConfD();
     }
@@ -78,20 +91,25 @@ class Jaal
     {
         if ($this->config->get('httpd') && ($port = $this->config->get('httpd.port')) && ($ip = $this->config->get('httpd.listen')))
         {
-            Logger::getInstance()->info('HTTPD listening on ' . $ip .':' . $port);
+            Logger::getInstance()->log(100, 'HTTPD listening on ' . $ip . ':' . $port);
             $socket = new SocketServer($this->loop);
             $this->httpd = new Httpd($this->loop, $socket, $this->dns);
             $this->httpd->listen($port, $ip);
 
-            #$this->loop->addPeriodicTimer(70, function () {
-            #    print_r($this->httpd->stats());
-            #});
+            $this->loop->addPeriodicTimer(50, function () {
+
+                print_r($this->httpd->stats());
+
+                echo date('Y-m-d H:i:s') . '----------------------------GC----------------------------' . "\n" .
+                    'Memory: ' . round(memory_get_usage() / 1024 / 1024, 2) . " MB\n" .
+                    'Peak Memory: ' . round(memory_get_peak_usage() / 1024 / 1024, 2) . "MB \n" . "\n\n";
+            });
         }
 
         if ($this->config->get('admin') && ($port = $this->config->get('admin.port')) && ($ip = $this->config->get('admin.listen'))) {
 
             $this->admin = new WAMP($this->loop);
-            Logger::getInstance()->info('Admin WAMP Server listening on ' . $ip . ':' . $port);
+            Logger::getInstance()->log(100, 'Admin WAMP Server listening on ' . $ip . ':' . $port);
 
             $socket = new SocketServer($this->loop);
             $socket->listen($port, $ip);
@@ -128,6 +146,10 @@ class Jaal
         }
     }
 
+    /**
+     * @param $name
+     * @return null|Httpd
+     */
     public function getDaemon($name)
     {
         $service = null;

@@ -8,6 +8,7 @@ use Hathoora\Jaal\Daemons\Http\Message\RequestInterface;
 use Hathoora\Jaal\Daemons\Http\Upstream\Request as UpstreamRequest;
 use Hathoora\Jaal\Daemons\Http\Upstream\RequestInterface as UpstreamRequestInterface;
 use Hathoora\Jaal\Daemons\Http\Vhost\Factory as VhostFactory;
+use Hathoora\Jaal\Daemons\Http\Vhost\Vhost;
 Use Hathoora\Jaal\IO\Manager\InboundManager;
 use Hathoora\Jaal\IO\Manager\OutboundManager;
 Use Hathoora\Jaal\IO\Manager\outoundManager;
@@ -19,6 +20,7 @@ use Evenement\EventEmitter;
 use Hathoora\Jaal\Util\Time;
 use React\EventLoop\LoopInterface;
 use React\Dns\Resolver\Resolver;
+use React\Promise\Deferred;
 
 /** @event connection */
 class Httpd extends EventEmitter implements HttpdInterface
@@ -39,19 +41,18 @@ class Httpd extends EventEmitter implements HttpdInterface
     protected $dns;
 
     /**
+     * This takes care of incoming connections, timeouts, stats and so on
+     *
      * @var InboundManager
      */
     public $inboundIOManager;
 
     /**
+     * This takes care of outgoing connections, timeouts, stats and so on
+     *
      * @var OutboundManager
      */
     public $outboundIOManager;
-
-    /**
-     * @var array stores requests
-     */
-    private $arrRequests = array();
 
     /**
      * @param LoopInterface $loop
@@ -66,11 +67,11 @@ class Httpd extends EventEmitter implements HttpdInterface
         $this->inboundIOManager = new InboundManager($this->loop, 'http');
         $this->outboundIOManager = new OutboundManager($this->loop, $dns, 'http');
         $this->listen();
-        $this->init();
+        $this->handleClientConnection();
     }
 
     /**
-     * Start listening
+     * Start listening to HTTP requests from clients
      *
      * @param int $port
      * @param string $host
@@ -80,7 +81,10 @@ class Httpd extends EventEmitter implements HttpdInterface
         $this->socket->listen($port, $host);
     }
 
-    private function init()
+    /**
+     * This method handles client connections
+     */
+    private function handleClientConnection()
     {
         $this->socket->on('connection', function (ConnectionInterface $client) {
 
@@ -98,6 +102,8 @@ class Httpd extends EventEmitter implements HttpdInterface
     }
 
     /**
+     * Handles incoming data from client's request and makes sense of it
+     *
      * @param ConnectionInterface $client
      * @param $data
      */
@@ -107,23 +113,24 @@ class Httpd extends EventEmitter implements HttpdInterface
 
         if (!$this->inboundIOManager->getProp($client, 'request')) {
 
-            /** @var $request \Hathoora\Jaal\Daemons\Http\Client\RequestInterface */
+            /** @var $request ClientRequestInterface */
             $request = Parser::getClientRequest($data);
             $request->setStartTime()
                 ->setStream($client);
 
             Logger::getInstance()->log(-50,
                 'REQUEST ' . $request->getMethod() . ' ' . Logger::getInstance()->color($request->getUrl(),
-                    'red') . ' ' . $request->getHost() . ' using stream: ' . Logger::getInstance()->color($client->id,
+                    'red') . ' using stream: ' . Logger::getInstance()->color($client->id,
                     'green') . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
                     'yellow'));
 
             $client->resource = $request->getUrl();
             $client->hits++;
+            $this->inboundIOManager->stats['hits']++;
 
             if ($client->hits > 1) {
                 Logger::getInstance()->log(-99,
-                    Logger::getInstance()->color($client->id, 'green') . ' keep-alive requested '. $request->getUrl() .', hits: ' . $client->hits . ', idle: ' . Time::millitimeDiff($this->inboundIOManager->getProp($client,
+                    Logger::getInstance()->color($client->id, 'green') . ' keep-alive requested ' . $request->getUrl() . ', hits: ' . $client->hits . ', idle: ' . Time::millitimeDiff($this->inboundIOManager->getProp($client,
                         'lastActivity')) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
                         'lightCyan'));
             }
@@ -131,43 +138,138 @@ class Httpd extends EventEmitter implements HttpdInterface
             $this->inboundIOManager->setProp($client, 'request', $request);
 
         } else {
-            /** @var $request \Hathoora\Jaal\Daemons\Http\Client\RequestInterface */
+            /** @var $request ClientRequestInterface */
             if ($request = $request = $this->inboundIOManager->getProp($client, 'request')) {
-                $request->handleData($client, $data);
+                $request->handleIncomingData($client, $data);
             }
         }
 
 
         if ($request && $request->isValid() === true) {
-
-            $emitVhostKey = 'client.request.' . $request->getHost() . ':' . $request->getPort();
-
-            if (count($this->listeners($emitVhostKey))) {
-                $this->emit($emitVhostKey, [$request]);
-            } else {
-                $this->emit('client.request' . ':' . $request->getPort(), [$request]);
-            }
-        }
-
-        if (!$request) {
-
+            $this->emitClientRequestHandler($request);
+        } else {
             Logger::getInstance()->log('ERROR', 'Unable to handle client request.');
             $client->end();
         }
     }
 
-    public function proxy($arrVhostConfig, ClientRequestInterface $clientRequest)
+    /**
+     * Similar to handleClientRequestData, this method handle's response data from upstream and makes sense of it
+     *
+     * @param Stream $stream
+     * @param $data
+     */
+    protected function handleUpstreamRequestData(Stream $stream, $data)
     {
-        static $i = 0;
-        $i++;
+        /** @var $request \Hathoora\Jaal\Daemons\Http\Upstream\RequestInterface */
+        if ($request = $this->outboundIOManager->getProp($stream, 'request')) {
+            $request->handleUpstreamOutputData($stream, $data);
+        } else {
+            die('handleUpstreamRequestData error');
+        }
+    }
+
+
+    /**
+     * After handling incoming client's request data, this method notifies to take action
+     *
+     * @param ClientRequestInterface $request
+     * @emit client.request:HOST:PORT
+     * @emit client.request:PORT        emitted if no listeners for above event are listening
+     * @return string
+     */
+    public function emitClientRequestHandler(ClientRequestInterface $request)
+    {
+        $event = 'client.request:';
+        $emitEvent = $event . $request->getHost() . ':' . $request->getPort();
+
+        if (count($this->listeners($emitEvent))) {
+            Logger::getInstance()->log(-99, 'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
+            $this->emit($emitEvent, [$request]);
+        } else {
+            $emitName = $event . $request->getPort();
+            Logger::getInstance()->log(-99, 'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
+            $this->emit($emitName, [$request]);
+        }
+
+        return $emitName;
+    }
+
+    /**
+     * After receiving client's request response and about to reply back to client, this function notifies to take any action.
+     *
+     * @param ClientRequestInterface $request
+     * @param $code int
+     * @param $description string
+     * @emit client.response:HOST:PORT
+     * @emit client.response:PORT        emitted if no listeners for above event are listening
+     * @return string
+     */
+    public function emitClientResponseHandler(ClientRequestInterface $request, $code, $description)
+    {
+        $event = 'upstream.response:';
+        $emitEvent = $event . $request->getHost() . ':' . $request->getPort();
+
+        if (count($this->listeners($emitEvent))) {
+            Logger::getInstance()->log(-99, 'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
+            $this->emit($emitEvent, [$request]);
+        } else {
+            $emitName = $event . $request->getPort();
+            Logger::getInstance()->log(-99, 'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
+            $this->emit($emitName, [$request]);
+        }
+
+        return $emitName;
+    }
+
+
+    /**
+     * After receiving upstream response and about to reply back to client, this function notifies to take any action.
+     *
+     * @param UpstreamRequestInterface $request
+     * @param $code int
+     * @param $description string
+     * @emit upstream.response:HOST:PORT
+     * @emit upstream.response:PORT        emitted if no listeners for above event are listening
+     * @return string
+     */
+    public function emitUpstreamResponseHandler(UpstreamRequestInterface $request, $code, $description)
+    {
+        $event = 'upstream.response:';
+        $emitEvent = $event . $request->getHost() . ':' . $request->getPort();
+
+        if (count($this->listeners($emitEvent))) {
+            Logger::getInstance()->log(-99, 'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
+            $this->emit($emitEvent, [$request]);
+        } else {
+            $emitName = $event . $request->getPort();
+            Logger::getInstance()->log(-99, 'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
+            $this->emit($emitName, [$request]);
+        }
+
+        return $emitName;
+    }
+
+    /**
+     * For proxying client's request to upstream
+     *
+     * @param $vhostConfig array|Vhost
+     * @param ClientRequestInterface $clientRequest
+     */
+    public function proxy($vhostConfig, ClientRequestInterface $clientRequest)
+    {
         Logger::getInstance()->log(-50,
             'PROXY ' . $clientRequest->getMethod() . ' ' . Logger::getInstance()->color($clientRequest->getUrl(),
-                'red') . ' ' . $clientRequest->getHost() . ' using stream: ' . Logger::getInstance()->color($clientRequest->getStream()->id,
+                'red') . ' using stream: ' . Logger::getInstance()->color($clientRequest->getStream()->id,
                 'green') . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
                 'yellow'));
 
-        $vhost = VhostFactory::create($arrVhostConfig, $clientRequest->getScheme(), $clientRequest->getHost(),
-            $clientRequest->getPort());
+        if (is_array($vhostConfig)) {
+            $vhost = VhostFactory::create($vhostConfig, $clientRequest->getScheme(), $clientRequest->getHost(), $clientRequest->getPort());
+        } else if ($vhostConfig instanceof Vhost) {
+            $vhost = $vhostConfig;
+        }
+
         $arrUpstreamConfig = $vhost->getUpstreamConnectorConfig();
 
         $ip = $arrUpstreamConfig['ip'];
@@ -180,50 +282,27 @@ class Httpd extends EventEmitter implements HttpdInterface
 
         $this->outboundIOManager->buildConnector($ip, $port, $keepalive, $timeout)->then(
 
-            function (Stream $stream) use ($upstreamRequest, $i) {
+            function (Stream $stream) use ($upstreamRequest) {
 
-                $this->outboundIOManager->setProp($stream, 'request', $upstreamRequest);
                 $stream->hits++;
                 $stream->resource = $upstreamRequest->getUrl();
+                $this->outboundIOManager->stats['hits']++;
+                $this->outboundIOManager->setProp($stream, 'request', $upstreamRequest);
 
                 $upstreamRequest->setStartTime()
                     ->setStream($stream)
                     ->setState(RequestInterface::STATE_CONNECTING)
                     ->send();
 
-                $stream->on('data', function ($data) use ($stream, $upstreamRequest) {
-
-                    #if (!$this->outboundIOManager->getProp($stream, 'request'))
-                    #{
-                    #    $this->outboundIOManager->setProp($stream, 'request', $upstreamRequest);
-                    #}
-
+                $stream->on('data', function ($data) use ($stream) {
                     $this->handleUpstreamRequestData($stream, $data);
                 });
-            }, function($error) {
 
-                die("ERROR buildConnector....");
+            }, function ($error) use ($clientRequest) {
+
+                $clientRequest->reply(500);
             }
         );
-    }
-
-    protected function handleUpstreamRequestData(Stream $stream, $data)
-    {
-        /** @var $request \Hathoora\Jaal\Daemons\Http\Upstream\RequestInterface */
-        if ($request = $this->outboundIOManager->getProp($stream, 'request')) {
-            $request->handleData($stream, $data);
-        } else {
-
-            die('handleUpstreamRequestData error');
-            //echo "---------------------------------------\n". $data . "---------------------------------------\n";
-
-            Logger::getInstance()->log(-99,
-                'ERROR  handleUpstreamRequestData stream: ' . Logger::getInstance()->color($stream->id,
-                    'green') . ' has no request ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
-                    'yellow'));
-            $stream->end();
-
-        }
     }
 
     /**

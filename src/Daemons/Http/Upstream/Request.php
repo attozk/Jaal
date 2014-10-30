@@ -2,27 +2,42 @@
 
 namespace Hathoora\Jaal\Daemons\Http\Upstream;
 
+use Hathoora\Jaal\Jaal;
+use Hathoora\Jaal\Logger;
+use Hathoora\Jaal\Daemons\Http\Client\RequestInterface as ClientRequestInterface;
 use Hathoora\Jaal\Daemons\Http\Message\Parser;
 use Hathoora\Jaal\Daemons\Http\Message\Response;
 use Hathoora\Jaal\Daemons\Http\Message\ResponseInterface;
 use Hathoora\Jaal\Daemons\Http\Vhost\Vhost;
-use Hathoora\Jaal\Daemons\Http\Client\RequestInterface as ClientRequestInterface;
 use Hathoora\Jaal\IO\React\SocketClient\ConnectorInterface;
-use Hathoora\Jaal\Jaal;
-use Hathoora\Jaal\Logger;
 use Hathoora\Jaal\IO\React\SocketClient\Stream;
 use Hathoora\Jaal\Util\Time;
 
 Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements RequestInterface
 {
-    protected $stream;
-    protected $response;
-
     /**
      * @var Vhost
      */
     protected $vhost;
 
+    /**
+     * @var ClientRequestInterface
+     */
+    protected $clientRequest;
+
+    /**
+     * @var Stream
+     */
+    protected $stream;
+
+    /**
+     * @var ResponseInterface
+     */
+    protected $response;
+
+    /**
+     * @var array
+     */
     private $handleUpstreamDataAtts = array(
         'consumed' => 0,
         'length' => 0,
@@ -33,10 +48,9 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     );
 
     /**
-     * @var ClientRequestInterface
+     * @param Vhost $vhost
+     * @param ClientRequestInterface $clientRequest
      */
-    protected $clientRequest;
-
     public function __construct(Vhost $vhost, ClientRequestInterface $clientRequest)
     {
         parent::__construct($clientRequest->getMethod(), $clientRequest->getUrl(), $clientRequest->getHeaders());
@@ -65,7 +79,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         $arrHeaders = $this->vhost->config->get('headers.server_to_upstream_request');
 
         foreach ($arrHeaders as $header => $value) {
-            $this->setHeader($header, $value);
+            $this->addHeader($header, $value);
         }
 
         // copy headers from original (client) request to request we will make to upstream
@@ -74,26 +88,28 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
             $header = strtolower($header);
 
             if (isset(Headers::$arrAllowedUpstreamHeaders[$header]) && !$this->hasHeader($header)) {
-                $this->setHeader($header, $value);
+                $this->addHeader($header, $value);
             }
         }
     }
 
     protected function prepareClientResponseHeader()
     {
-        $arrHeaders = $this->vhost->config->get('headers.upstream_to_client_response');
+        if ($this->clientRequest->getResponse()) {
+            $arrHeaders = $this->vhost->config->get('headers.upstream_to_client_response');
 
-        foreach ($arrHeaders as $header => $value) {
-            if ($value === false) {
-                $this->clientRequest->getResponse()->removeHeader($header);
-            } else {
-                $this->clientRequest->getResponse()->addHeader($header, $value);
+            foreach ($arrHeaders as $header => $value) {
+                if ($value === false) {
+                    $this->clientRequest->getResponse()->removeHeader($header);
+                } else {
+                    $this->clientRequest->getResponse()->addHeader($header, $value);
+                }
             }
-        }
 
-        $this->clientRequest->setHeader('Exec-Time', $this->clientRequest->getExecutionTime());
-        $this->clientRequest->setHeader('X-Exec-Time', $this->getExecutionTime());
-        $this->clientRequest->setExecutionTime();
+            $this->clientRequest->getResponse()->addHeader('Exec-Time', $this->clientRequest->getExecutionTime());
+            $this->clientRequest->getResponse()->addHeader('X-Exec-Time', $this->getExecutionTime());
+            $this->clientRequest->setExecutionTime();
+        }
     }
 
     public function send()
@@ -112,14 +128,11 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     /**
      * Handles upstream data
      */
-    public function handleData(Stream $stream, $data)
+    public function handleUpstreamOutputData(Stream $stream, $data)
     {
-        $request = $this;
+        if ($this->vhost->outboundIOManager->getProp($stream, 'request')) {
 
-        #if ($this->vhost->outboundIOManager->getProp($stream, 'request')) {
-
-        #$request = $this->vhost->outboundIOManager->getProp($stream, 'request');
-        #$request = $this;
+            $request = $this->vhost->outboundIOManager->getProp($stream, 'request');
 
             $consumed =& $request->handleUpstreamDataAtts['consumed'];
             $length =& $request->handleUpstreamDataAtts['length'];
@@ -183,29 +196,45 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
                     if ($request->response instanceof ResponseInterface) {
                         $request->setExecutionTime();
                         $request->response->setMethod($this->getMethod());
-                        $request->clientRequest->setResponse(clone $this->response);
                         $request->setState(self::STATE_DONE);
-                        $request->prepareClientResponseHeader();
-                        $request->end();
-                        $request->clientRequest->reply();
-                    } else
+                        $request->clientRequest->setResponse(clone $this->response);
+                        $this->end();
+
+                    } else {
                         $hasError = 404;
+                    }
                 }
             }
-        #} else {
-        #    $hasError = 500;
-        #}
 
-        if ($hasError) {
-            $request->setState(self::STATE_ERROR);
-            $request->end();
-            $request->clientRequest->error($hasError);
+
+            if ($hasError) {
+                $request->setState(self::STATE_ERROR);
+                $request->end();
+            }
+
+        } else {
+            die('Out of sync...');
         }
     }
 
-    public function reply()
+    /**
+     * Upstream reply is client's request response
+     *
+     * @param null $code to overwrite upstream's response
+     * @param null $message
+     * @return mixed
+     */
+    public function reply($code = null, $message = null)
     {
+        $this->prepareClientResponseHeader();
+        $this->end();
 
+        $eventName = Jaal::getInstance()->getDaemon('httpd')->emitUpstreamResponseHandler($this, $code, $message);
+
+        // by default spit the message out
+        if (!Jaal::getInstance()->getDaemon('httpd')->listeners($eventName)) {
+            $this->clientRequest->reply($code, $message);
+        }
     }
 
     private function end()
@@ -215,11 +244,6 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         if (!$this->vhost->config->get('upstreams.keepalive.max') && !$this->vhost->config->get('upstreams.keepalive.max')) {
             $this->stream->end();
         }
-    }
-
-    public function error($code, $description = '')
-    {
-
     }
 
     /**

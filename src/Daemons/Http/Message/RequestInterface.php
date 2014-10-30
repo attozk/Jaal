@@ -11,35 +11,75 @@ interface RequestInterface extends MessageInterface
     const STATE_ERROR = 7;
     const STATE_DONE = 9;
 
+    /**
+     * Set's interal state of request as it goes through various stages
+     * When passed NULL it would automatically try to set appropriate state
+     *
+     * @param null $state
+     * @internal This is not to be mixed with HTTP Request/Response status code
+     * @return self
+     */
     public function setState($state = null);
+
+    /**
+     * Returns internal state
+     *
+     * @internal This is not to be mixed with HTTP Request/Response status code
+     * @return mixed
+     */
     public function getState();
+
+    /**
+     * Returns headers as an array of HEADER: VALUE
+     *
+     * @return array
+     */
     public function getHeaderLines();
+
+    /**
+     * Returns raw HTTP Headers that usually initiate HTTP request
+     *
+     * @return sring
+     */
     public function getRawHeaders();
 
     /**
-     * Sets start time of request in miliseconds
+     * Sets start time of request in milliseconds
      *
-     * @param null|int $miliseconds
+     * @param null|int $millitime when NULL uses current millitime
      * @return self
      */
-    public function setStartTime($miliseconds = null);
+    public function setStartTime($millitime = null);
 
     /**
-     * Sets execution time of request in miliseconds
+     * Sets execution time of request in milliseconds
      *
+     * @param int|null $millitime when passed, it would use passed millitime to overwrite execution time
      * @return self
      */
-    public function setExecutionTime();
+    public function setExecutionTime($millitime = null);
 
     /**
-     * Gets execution time of request in miliseconds
+     * Gets execution time of request in milliseconds
+     *
+     * @return int milliseconds
      */
     public function getExecutionTime();
 
     /**
+     * Set the URI scheme of the request (http, https, ftp, etc)
+     *
+     * @param $method
+     * @return self
+     */
+    public function setMethod($method);
+
+    /**
+     * Get the HTTP method of the request
+     *
      * @return string
      */
-    public function __toString();
+    public function getMethod();
 
     /**
      * Set the URL of the request
@@ -51,27 +91,26 @@ interface RequestInterface extends MessageInterface
     public function setUrl($url);
 
     /**
-     * Get the full URL of the request (e.g. 'http://www.guzzle-project.com/')
+     * Get the full URL of the request (e.g. 'http://www.github.com/path?query=1')
      *
      * @return string
      */
     public function getUrl();
 
-    public function getResource();
-
-    public function setQuery($str);
-
-    public function getQuery();
-
-
-    public function setMethod($method);
-
     /**
-     * Get the HTTP method of the request
+     * Get resource of URL, which is /PATH + QUERY
      *
      * @return string
      */
-    public function getMethod();
+    public function getResource();
+
+    /**
+     * Set the URI scheme of the request (http, https, ftp, etc)
+     *
+     * @param string $scheme Scheme to set
+     * @return self
+     */
+    public function setScheme($scheme);
 
     /**
      * Get the URI scheme of the request (http, https, ftp, etc)
@@ -79,54 +118,6 @@ interface RequestInterface extends MessageInterface
      * @return string
      */
     public function getScheme();
-
-    /**
-     * Set the URI scheme of the request (http, https, ftp, etc)
-     *
-     * @param string $scheme Scheme to set
-     *
-     * @return self
-     */
-    public function setScheme($scheme);
-
-    /**
-     * Get the host of the request
-     *
-     * @return string
-     */
-    public function getHost();
-
-    /**
-     * Set the host of the request. Including a port in the host will modify the port of the request.
-     *
-     * @param string $host Host to set (e.g. www.yahoo.com, www.yahoo.com:80)
-     *
-     * @return self
-     */
-    public function setHost($host);
-
-    /**
-     * Get the path of the request (e.g. '/', '/index.html')
-     *
-     * @return string
-     */
-    public function getPath();
-
-    /**
-     * Set the path of the request (e.g. '/', '/index.html')
-     *
-     * @param string|array $path Path to set or array of segments to implode
-     *
-     * @return self
-     */
-    public function setPath($path);
-
-    /**
-     * Get the port that the request will be sent on if it has been set
-     *
-     * @return int|null
-     */
-    public function getPort();
 
     /**
      * Set the port that the request will be sent on
@@ -138,20 +129,70 @@ interface RequestInterface extends MessageInterface
     public function setPort($port);
 
     /**
-     * Get the HTTP protocol version of the request
+     * Get the port that the request will be sent on if it has been set
+     *
+     * @return int|null
+     */
+    public function getPort();
+
+    /**
+     * Set the host of the request. Including a port in the host will modify the port of the request.
+     *
+     * @param string $host Host to set (e.g. www.yahoo.com, www.yahoo.com:80)
+     * @return self
+     */
+    public function setHost($host);
+
+    /**
+     * Get the host of the request
      *
      * @return string
      */
-    public function getProtocolVersion();
+    public function getHost();
 
     /**
-     * Set the HTTP protocol version of the request (e.g. 1.1 or 1.0)
+     * Set the path of the request (e.g. '/', '/index.html')
      *
-     * @param string $protocol HTTP protocol version to use with the request
-     *
+     * @param string $path Path to set or array of segments to implode
      * @return self
      */
-    public function setProtocolVersion($protocol);
+    public function setPath($path);
 
+    /**
+     * Get the path of the request (e.g. '/', '/index.html')
+     *
+     * @return string
+     */
+    public function getPath();
+
+    /**
+     * Set the query of the request (e.g. id=1&sort=asc)
+     *
+     * @param string $query
+     * @return self
+     */
+    public function setQuery($query);
+
+    /**
+     * Get the query of the request (e.g. id=1&sort=asc)
+     *
+     * @param bool $toArray when true, return as array
+     * @return null|string|array
+     */
+    public function getQuery($toArray = false);
+
+    /**
+     * Checks to see if we have a proper message
+     *
+     * This returns TRUE when message is valid
+     * This returns CODE when message is invalid
+     *
+     * @return true|int
+     */
     public function isValid();
+
+    /**
+     * @return string
+     */
+    public function __toString();
 }

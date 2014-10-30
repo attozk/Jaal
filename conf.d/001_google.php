@@ -1,6 +1,6 @@
 <?php
 
-$httpd->on('client.request:800', function ($request) use ($httpd) {
+$httpd->on('client.request:800', function (\Hathoora\Jaal\Daemons\Http\Client\RequestInterface $request) use ($httpd) {
 
     $conf = '
 http_version: 1.1

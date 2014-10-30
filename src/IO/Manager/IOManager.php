@@ -10,7 +10,8 @@ abstract class IOManager
     protected $streams = '';
 
     public $stats = array(
-        'streams' => 0,
+        'streams' => 0, // number of connections
+        'hits' => 0,    // number of requests
         'bytes' => 0,
         'concurrency' => array(/*
              $id => array(

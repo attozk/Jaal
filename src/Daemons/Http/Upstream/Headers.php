@@ -4,7 +4,11 @@ namespace Hathoora\Jaal\Daemons\Http\Upstream;
 
 class Headers
 {
-    //allowed headers that we can pass from client to proxy
+    /**
+     * List of headers that we can pass from client to upstream server
+     *
+     * @var array
+     */
     public static $arrAllowedUpstreamHeaders = array(
         'accept' => 1,
         'accept-language' => 1,

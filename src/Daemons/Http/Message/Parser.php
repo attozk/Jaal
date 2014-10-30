@@ -5,7 +5,9 @@ namespace Hathoora\Jaal\Daemons\Http\Message;
 use Hathoora\Jaal\Daemons\Http\Client\Request as ClientRequest;
 
 /**
- * Request and response parser used by Guzzle
+ * This is the modified Parser class from Guzzle
+ *
+ * @url https://github.com/guzzle/guzzle
  */
 class Parser
 {
@@ -47,8 +49,10 @@ class Parser
     }
 
     /**
+     * Returns a Client Request object after parsing the message
+     *
      * @param $message
-     * @return ClientRequest
+     * @return bool|ClientRequest
      */
     public static function getClientRequest($message)
     {
@@ -94,6 +98,12 @@ class Parser
         }
     }
 
+    /**
+     * Returns a Response object after parsing the message
+     *
+     * @param $message
+     * @return bool|Response
+     */
     public static function getResponse($message)
     {
         if (!($parsed = self::parseResponse($message))) {

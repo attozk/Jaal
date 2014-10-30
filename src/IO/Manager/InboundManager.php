@@ -2,8 +2,10 @@
 
 namespace Hathoora\Jaal\IO\Manager;
 
+use Hathoora\Jaal\Jaal;
 use Hathoora\Jaal\Logger;
 use Hathoora\Jaal\Util\Time;
+use React\EventLoop\Timer\TimerInterface;
 
 /**
  * Class Inbound for managing inbound connections
@@ -42,7 +44,7 @@ class InboundManager extends IOManager
 
         if ($notAdded) {
 
-            /* @TODO timeouts
+            /* @TODO revisit timeouts */
             if ($this->protocol == 'http') {
                 $timeout = Jaal::getInstance()->config->get('httpd.timeout');
                 $keepaliveTimeout = Jaal::getInstance()->config->get('httpd.keepalive.timeout');
@@ -82,7 +84,7 @@ class InboundManager extends IOManager
                         });
                     $this->setProp($stream, 'timerKeepaliveTimeout', $timerKeepaliveTimeout);
                 }
-            }*/
+            }
         }
 
         return $this;
