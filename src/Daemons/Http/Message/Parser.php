@@ -3,6 +3,8 @@
 namespace Hathoora\Jaal\Daemons\Http\Message;
 
 use Hathoora\Jaal\Daemons\Http\Client\RequestInterface as ClientRequestInterface;
+use Hathoora\Jaal\Daemons\Http\Client\Request as ClientRequest;
+
 
 /**
  * This is the modified Parser class from Guzzle
@@ -51,7 +53,7 @@ class Parser
      * Returns a Client Request object after parsing the message
      *
      * @param $message
-     * @return bool|ClientRequestInterface
+     * @return bool|ClientRequestInterface|ClientRequest
      */
     public static function getClientRequest($message)
     {

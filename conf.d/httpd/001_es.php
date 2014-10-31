@@ -1,6 +1,13 @@
 <?php
+/** @var $httpd \Hathoora\Jaal\Daemons\Http\Httpd */
+$httpd->on('client.response:www.es.com:800', function (\Hathoora\Jaal\Daemons\Http\Client\RequestInterface $request) use ($httpd) {
+    print_r(json_encode($request->getResponse()->getBody()));
+
+    $request->reply();
+});
 
 $httpd->on('client.request:www.es.com:800', function (\Hathoora\Jaal\Daemons\Http\Client\RequestInterface $request) use ($httpd) {
+
 
     $arrVhostConfig = array(
 // nginx inspred
@@ -28,58 +35,33 @@ $httpd->on('client.request:www.es.com:800', function (\Hathoora\Jaal\Daemons\Htt
         )
     );
 
-// ES data @ https://github.com/bly2k/files/blob/master/accounts.zip?raw=true
-
+    // ES data @ https://github.com/bly2k/files/blob/master/accounts.zip?raw=true
     $elasticaClient = new Elastica\Client();
-
     $elasticaIndex = $elasticaClient->getIndex('bank')->getType('account');
 
 
     $elasticQuery = new \Elastica\Query();
     $boolQuery = new \Elastica\Query\Bool();
 
-// search criteria #1
+    // search criteria #1
     $termQueryBroker = new \Elastica\Query\Term(array('firstname' => 'Opal'));
 
-
-// search criteria #2
+    // search criteria #2
     $multiMatchQuery = new \Elastica\Query\QueryString();
     $multiMatchQuery->setQuery('Lam*')
         ->setFields(array('firstname^3', 'lastname^3', 'employer'));
-
 
     $boolQuery->addMust($termQueryBroker)
         ->addMust($multiMatchQuery);
 
     $elasticQuery->setQuery($boolQuery);
-
     $esQueryArray = $elasticQuery->toArray();
-#print_r($esQueryArray);
-#print_r(\Elastica\JSON::stringify($esQueryArray));
-    echo "\n";
 
-    $path = '/' . $elasticaIndex->getIndex()->getName() . "/" . $elasticaIndex->getName() . '/_mapping';
-#$baseUri .= $request->getPath();
+    $path = '/' . $elasticaIndex->getIndex()->getName() . "/" . $elasticaIndex->getName() . '/_search';
 
     $request->setPath($path);
+    $request->setBody(\Elastica\JSON::stringify($esQueryArray));
 
     $httpd->proxy($arrVhostConfig, $request);
-
-    /*
-    #$query = $request->getQuery();
-    //print_r($elasticaIndex->getMapping()) ;
-    echo "\n\n";
-
-    $request->error(450);
-
-    return;
-    */
-
-#$elasticaResultSet = $elasticaIndex->search($elasticQuery);
-
-#print_r($elasticaResultSet);
-
-#$httpd->proxy($arrVhostConfig, $request);
-    $httpd->proxy($arrVhostConfig, $request);
-
 });
+

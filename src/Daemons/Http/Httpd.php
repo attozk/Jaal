@@ -200,62 +200,29 @@ class Httpd extends EventEmitter implements HttpdInterface
      * action.
      *
      * @param ClientRequestInterface $request
-     * @param                        $code        int
-     * @param                        $description string
      * @emit client.response:HOST:PORT
      * @emit client.response:PORT        emitted if no listeners for above event are listening
      * @return string
      */
-    public function emitClientResponseHandler(ClientRequestInterface $request, $code, $description)
+    public function emitClientResponseHandler(ClientRequestInterface $request)
     {
-        $event     = 'upstream.response:';
+        $event = 'client.response:';
         $emitEvent = $event . $request->getHost() . ':' . $request->getPort();
 
         if (count($this->listeners($emitEvent))) {
             Logger::getInstance()
                   ->log(-99,
                       'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
-            $this->emit($emitEvent, [$request, $code, $description]);
+            $this->emit($emitEvent, [$request]);
         } else {
             $emitEvent = $event . $request->getPort();
             Logger::getInstance()
                   ->log(-99,
                       'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
-            $this->emit($emitEvent, [$request, $code, $description]);
+            $this->emit($emitEvent, [$request]);
         }
 
         return $emitEvent;
-    }
-
-    /**
-     * After receiving upstream response and about to reply back to client, this function notifies to take any action.
-     *
-     * @param UpstreamRequestInterface $request
-     * @param                          $code        int
-     * @param                          $description string
-     * @emit upstream.response:HOST:PORT
-     * @emit upstream.response:PORT        emitted if no listeners for above event are listening
-     * @return string
-     */
-    public function emitUpstreamResponseHandler(UpstreamRequestInterface $request, $code, $description)
-    {
-        $event     = 'upstream.response:';
-        $emitEvent = $event . $request->getHost() . ':' . $request->getPort();
-
-        if (count($this->listeners($emitEvent))) {
-            Logger::getInstance()
-                  ->log(-99,
-                      'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
-            $this->emit($emitEvent, [$request, $code, $description]);
-        } else {
-            $emitName = $event . $request->getPort();
-            Logger::getInstance()
-                  ->log(-99,
-                      'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
-            $this->emit($emitName, [$request, $code, $description]);
-        }
-
-        return $emitName;
     }
 
     /**

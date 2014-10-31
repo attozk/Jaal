@@ -133,7 +133,7 @@ class Jaal
     /**
      * Load confD
      *
-*@TODO make this async
+     * @TODO make this async
      */
     public function initConfD()
     {
@@ -145,7 +145,7 @@ class Jaal
         foreach ($regex as $item) {
 
             $filePath = $item->getPathname();
-            Logger::getInstance()->debug('HTTPD config file loaded: ' . $filePath);
+            Logger::getInstance()->debug('Config file loaded: ' . $filePath);
 
             include($filePath);
         }

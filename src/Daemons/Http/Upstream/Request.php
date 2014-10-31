@@ -237,7 +237,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
                     $this->response->setMethod($this->getMethod());
                     $this->setState(self::STATE_DONE);
                     $this->clientRequest->setResponse(clone $this->response);
-                    $this->end();
+                    $this->reply();
                 } else {
                     $hasError = 404;
                 }
@@ -246,7 +246,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 
         if ($hasError) {
             $this->setState(self::STATE_ERROR);
-            $this->end();
+            $this->reply(500);
         }
     }
 
@@ -282,13 +282,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     {
         $this->prepareClientResponseHeader();
         $this->cleanup();
-
-        $eventName = Jaal::getInstance()->getDaemon('httpd')->emitUpstreamResponseHandler($this, $code, $message);
-
-        // by default spit the message out
-        if (!Jaal::getInstance()->getDaemon('httpd')->listeners($eventName)) {
-            $this->clientRequest->reply($code, $message);
-        }
+        $this->clientRequest->reply($code, $message);
     }
 
     /**

@@ -111,8 +111,13 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
             $this->response->setReasonPhrase($message);
         }
 
-        $this->stream->write($this->response->getRawHeaders() . "\r\n" . $this->response->getBody());
-        $this->cleanup();
+        $eventName = Jaal::getInstance()->getDaemon('httpd')->emitClientResponseHandler($this);
+
+        // by default spit the message out
+        if (!Jaal::getInstance()->getDaemon('httpd')->listeners($eventName)) {
+            $this->stream->write($this->response->getRawHeaders() . "\r\n" . $this->response->getBody());
+            $this->cleanup();
+        }
     }
 
     /**
