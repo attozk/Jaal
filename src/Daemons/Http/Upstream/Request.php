@@ -6,12 +6,9 @@ use Hathoora\Jaal\Jaal;
 use Hathoora\Jaal\Logger;
 use Hathoora\Jaal\Daemons\Http\Client\RequestInterface as ClientRequestInterface;
 use Hathoora\Jaal\Daemons\Http\Message\Parser;
-use Hathoora\Jaal\Daemons\Http\Message\Response;
 use Hathoora\Jaal\Daemons\Http\Message\ResponseInterface;
 use Hathoora\Jaal\Daemons\Http\Vhost\Vhost;
-use Hathoora\Jaal\IO\React\SocketClient\ConnectorInterface;
 use Hathoora\Jaal\IO\React\SocketClient\Stream;
-use Hathoora\Jaal\Util\Time;
 
 Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements RequestInterface
 {
@@ -38,29 +35,29 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     /**
      * @var array
      */
-    private $handleUpstreamDataAtts = [
-        'consumed' => 0,
-        'length' => 0,
-        'buffer' => '',
-        'methodEOM' => '',
-        'segments' => 0,
-        'hasError' => false
-    ];
+    private $handleUpstreamDataAttrs
+        = [
+            'consumed'  => 0,
+            'length'    => 0,
+            'buffer'    => '',
+            'methodEOM' => '',
+            'segments'  => 0,
+            'hasError'  => FALSE
+        ];
 
     /**
-     * @param Vhost $vhost
+     * @param Vhost                  $vhost
      * @param ClientRequestInterface $clientRequest
      */
     public function __construct(Vhost $vhost, ClientRequestInterface $clientRequest)
     {
         parent::__construct($clientRequest->getMethod(), $clientRequest->getUrl(), $clientRequest->getHeaders());
         $this->setBody($clientRequest->getBody());
-        $this->vhost = $vhost;
+        $this->vhost         = $vhost;
         $this->clientRequest = $clientRequest;
         $this->prepareHeaders();
         $this->setState(ClientRequestInterface::STATE_PENDING);
     }
-
 
     /**
      * Prepares headers for the request which would be sent to upstream (from Jaal server)
@@ -115,7 +112,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     /**
      * Returns connection stream socket
      *
-     * @return ConnectorInterface
+     * @return Stream
      */
     public function getStream()
     {
@@ -155,106 +152,106 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         $hello = $this->getRawHeaders() . "\r\n\r\n" . $this->getBody();
 
         Logger::getInstance()->log(-100, "\n" . '----------- Request Write: ' . $this->id . ' -----------' . "\n" .
-            $hello .
-            "\n" . '----------- /Request Write: ' . $this->id . ' -----------' . "\n");
+                                         $hello .
+                                         "\n" . '----------- /Request Write: ' . $this->id . ' -----------' . "\n");
 
         $this->stream->write($hello);
     }
 
     /**
-     * Handles upstream data
+     * Handles upstream output data
+     *
+     * @param \Hathoora\Jaal\IO\React\SocketClient\Stream $stream
+     * @param                                             $data
+     * @return void
      */
     public function handleUpstreamOutputData(Stream $stream, $data)
     {
-        if ($this->vhost->outboundIOManager->getProp($stream, 'request')) {
+        $consumed  =& $this->handleUpstreamDataAttrs['consumed'];
+        $length    =& $this->handleUpstreamDataAttrs['length'];
+        $methodEOM =& $this->handleUpstreamDataAttrs['methodEOM'];
+        $hasError  =& $this->handleUpstreamDataAttrs['hasError'];
+        $buffer    =& $this->handleUpstreamDataAttrs['buffer'];
+        $segments  =& $this->handleUpstreamDataAttrs['segments'];
 
-            $request = $this->vhost->outboundIOManager->getProp($stream, 'request');
+        $segments++;
+        $isEOM    = FALSE;
+        $response = NULL;
+        $buffer .= $data;
 
-            $consumed =& $request->handleUpstreamDataAtts['consumed'];
-            $length =& $request->handleUpstreamDataAtts['length'];
-            $methodEOM =& $request->handleUpstreamDataAtts['methodEOM'];
-            $hasError =& $request->handleUpstreamDataAtts['hasError'];
-            $buffer =& $request->handleUpstreamDataAtts['buffer'];
-            $segments =& $request->handleUpstreamDataAtts['segments'];
+        if (!$methodEOM) {
 
-            $segments++;
-            $isEOM = false;
-            $response = null;
-            $buffer .= $data;
+            Logger::getInstance()
+                  ->log(-100, "\n" . '----------- Request Read: ' . $this->id . ' -----------' . "\n" .
+                              $data .
+                              "\n" . '----------- /Request Read: ' . $this->id . ' -----------' . "\n");
 
-            if (!$methodEOM) {
+            // @TODO no need to parse entire message, just look for content-length
 
-                Logger::getInstance()->log(-100, "\n" . '----------- Request Read: ' . $request->id . ' -----------' . "\n" .
-                    $data .
-                    "\n" . '----------- /Request Read: ' . $request->id . ' -----------' . "\n");
+            if (strlen($data)) {
+                $response = Parser::getResponse($data);
+            }
 
-                // @TODO no need to parse entire message, just look for content-length
+            if ($response) {
+                if ($response->hasHeader('Content-Length')) {
+                    $length    = $response->getHeader('Content-Length');
+                    $methodEOM = 'length';
+                } else if ($response->hasHeader('Transfer-Encoding') &&
+                           ($header = $response->getHeader('Transfer-Encoding')) && $header == 'chunked'
+                ) {
+                    $methodEOM = 'chunk';
+                } else {
+                    $hasError = 400;
+                }
 
-                if (strlen($data))
-                    $response = Parser::getResponse($data);
+                // remove header from body as we keep track of body length
+                $data = $response->getBody();
+            } else {
+                $hasError = 401;
+            }
+        }
+
+        if (!$hasError) {
+            // @TODO check of end of message in chunk mode
+            if ($methodEOM == 'chunk' && $data = "") {
+                $isEOM = TRUE;
+            } else if ($methodEOM == 'length') {
+
+                $consumed += strlen($data);
+
+                if ($consumed >= $length) {
+                    $isEOM = TRUE;
+                }
+            }
+
+            if ($isEOM) {
 
                 if ($response) {
-                    if ($response->hasHeader('Content-Length')) {
-                        $length = $response->getHeader('Content-Length');
-                        $methodEOM = 'length';
-                    } else if ($response->hasHeader('Transfer-Encoding') && ($header = $response->getHeader('Transfer-Encoding')) && $header == 'chunked') {
-                        $methodEOM = 'chunk';
-                    } else
-                        $hasError = 400;
-
-                    // remove header from body as we keep track of bodylength
-                    $data = $response->getBody();
+                    $this->response = $response;
                 } else {
-                    $hasError = 401;
-                }
-            }
-
-            if (!$hasError) {
-                // @TODO check of end of message in chunk mode
-                if ($methodEOM == 'chunk' && $data = "") {
-                    $isEOM = true;
-                } else if ($methodEOM == 'length') {
-
-                    $consumed += strlen($data);
-
-                    if ($consumed >= $length) {
-                        $isEOM = true;
-                    }
+                    $this->response = Parser::getResponse($buffer);
                 }
 
-                if ($isEOM) {
-
-                    if ($response)
-                        $request->response = $response;
-                    else
-                        $request->response = Parser::getResponse($buffer);
-
-                    if ($request->response instanceof ResponseInterface) {
-                        $request->setExecutionTime();
-                        $request->response->setMethod($this->getMethod());
-                        $request->setState(self::STATE_DONE);
-                        $request->clientRequest->setResponse(clone $this->response);
-                        $this->end();
-
-                    } else {
-                        $hasError = 404;
-                    }
+                if ($this->response instanceof ResponseInterface) {
+                    $this->setExecutionTime();
+                    $this->response->setMethod($this->getMethod());
+                    $this->setState(self::STATE_DONE);
+                    $this->clientRequest->setResponse(clone $this->response);
+                    $this->end();
+                } else {
+                    $hasError = 404;
                 }
             }
+        }
 
-
-            if ($hasError) {
-                $request->setState(self::STATE_ERROR);
-                $request->end();
-            }
-
-        } else {
-            die('Out of sync...');
+        if ($hasError) {
+            $this->setState(self::STATE_ERROR);
+            $this->end();
         }
     }
 
     /**
-     * Prepares client's reponse headers once upstream's response has been received
+     * Prepares client's response headers once upstream's response has been received
      */
     protected function prepareClientResponseHeader()
     {
@@ -262,7 +259,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
             $arrHeaders = $this->vhost->config->get('headers.upstream_to_client_response');
 
             foreach ($arrHeaders as $header => $value) {
-                if ($value === false) {
+                if ($value === FALSE) {
                     $this->clientRequest->getResponse()->removeHeader($header);
                 } else {
                     $this->clientRequest->getResponse()->addHeader($header, $value);
@@ -278,10 +275,10 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     /**
      * Upstream reply is client's request response
      *
-     * @param null $code to overwrite upstream's response
+     * @param null $code to overwrite upstream response
      * @param null $message
      */
-    public function reply($code = null, $message = null)
+    public function reply($code = NULL, $message = NULL)
     {
         $this->prepareClientResponseHeader();
         $this->cleanup();
@@ -299,10 +296,15 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
      */
     private function cleanup()
     {
-        Logger::getInstance()->log(-99, 'UPSTREAM RESPONSE ('. $this->state .') ' . Logger::getInstance()->color($this->getUrl(), 'red') . ' using remote stream: '. Logger::getInstance()->color($this->stream->id, 'green'));
+        Logger::getInstance()
+              ->log(-99,
+                  'UPSTREAM RESPONSE (' . $this->state . ') ' . Logger::getInstance()->color($this->getUrl(), 'red') .
+                  ' using remote stream: ' . Logger::getInstance()->color($this->stream->id, 'green'));
         Jaal::getInstance()->getDaemon('httpd')->outboundIOManager->removeProp($this->stream, 'request');
 
-        if (!$this->vhost->config->get('upstreams.keepalive.max') && !$this->vhost->config->get('upstreams.keepalive.max')) {
+        if (!$this->vhost->config->get('upstreams.keepalive.max') &&
+            !$this->vhost->config->get('upstreams.keepalive.max')
+        ) {
             $this->stream->end();
         }
     }

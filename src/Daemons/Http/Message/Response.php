@@ -19,10 +19,10 @@ Class Response extends Request implements ResponseInterface
     protected $reasonPhrase;
 
     /**
-     * @param $statusCode
+     * @param       $statusCode
      * @param array $headers
      */
-    public function __construct($statusCode, array $headers = array())
+    public function __construct($statusCode, array $headers = [])
     {
         parent::__construct('', '', $headers);
         $this->setStatusCode($statusCode);
@@ -37,7 +37,7 @@ Class Response extends Request implements ResponseInterface
     public function setStatusCode($code)
     {
         $this->statusCode = $code;
-        $reason = isset(StatusCode::$arrCodes[$code]) ? StatusCode::$arrCodes[$code] : '';
+        $reason           = isset(StatusCode::$arrCodes[$code]) ? StatusCode::$arrCodes[$code] : '';
         $this->setReasonPhrase($reason);
 
         return $this;
@@ -84,7 +84,7 @@ Class Response extends Request implements ResponseInterface
     public function getRawHeaders()
     {
         $headers = 'HTTP/1.1 ' . $this->statusCode . ' ' . $this->reasonPhrase . "\r\n";
-        $lines = $this->getHeaderLines();
+        $lines   = $this->getHeaderLines();
 
         if (!empty($lines)) {
             $headers .= implode("\r\n", $lines) . "\r\n";

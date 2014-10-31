@@ -9,11 +9,11 @@ use React\Promise\Deferred;
 class Client extends \Elastica\Client
 {
     /**
-     * Inits the client connections
+     * Init the client connections
      */
     protected function _initConnections()
     {
-        $connections = array();
+        $connections = [];
 
         foreach ($this->getConfig('connections') as $connection) {
             $connections[] = Connection::create($this->_prepareConnectionParams($connection));
@@ -31,7 +31,7 @@ class Client extends \Elastica\Client
         }
 
         if (!isset($this->_config['connectionStrategy'])) {
-            if ($this->getConfig('roundRobin') === true) {
+            if ($this->getConfig('roundRobin') === TRUE) {
                 $this->setConfigValue('connectionStrategy', 'RoundRobin');
             } else {
                 $this->setConfigValue('connectionStrategy', 'Simple');
@@ -56,16 +56,15 @@ class Client extends \Elastica\Client
 
     /**
      * Makes calls to the elasticsearch server based on this index
-     *
      * It's possible to make any REST query directly over this method
      *
-     * @param  string $path Path to call
+     * @param  string $path   Path to call
      * @param  string $method Rest method to use (GET, POST, DELETE, PUT)
-     * @param  array $data OPTIONAL Arguments as array
-     * @param  array $query OPTIONAL Query params
+     * @param  array  $data   OPTIONAL Arguments as array
+     * @param  array  $query  OPTIONAL Query params
      * @return \React\Promise\Promise
      */
-    public function request($path, $method = Request::GET, $data = array(), array $query = array())
+    public function request($path, $method = Request::GET, $data = [], array $query = [])
     {
         $deferred = new Deferred();
         $connection = $this->getConnection();

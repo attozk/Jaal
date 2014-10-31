@@ -4,28 +4,27 @@ namespace Hathoora\Jaal\Daemons\Http\Message;
 
 interface RequestInterface extends MessageInterface
 {
-    const STATE_PENDING = 0;
+    const STATE_PENDING    = 0;
     const STATE_CONNECTING = 1;
     const STATE_RETRIEVING = 2;
     const STATE_FINALIZING = 5;
-    const STATE_ERROR = 7;
-    const STATE_DONE = 9;
+    const STATE_ERROR      = 7;
+    const STATE_DONE       = 9;
 
     /**
-     * Set's interal state of request as it goes through various stages
+     * Set's internal state of request as it goes through various stages
      * When passed NULL it would automatically try to set appropriate state
-     *
      * This is not to be mixed with HTTP Request/Response status code
      *
      * @param null $state
      * @return self
      */
-    public function setState($state = null);
+    public function setState($state = NULL);
 
     /**
      * Returns internal state
-     *
      * This is not to be mixed with HTTP Request/Response status code
+     *
      * @return mixed
      */
     public function getState();
@@ -40,7 +39,7 @@ interface RequestInterface extends MessageInterface
     /**
      * Returns raw HTTP Headers that usually initiate HTTP request
      *
-     * @return sring
+     * @return string
      */
     public function getRawHeaders();
 
@@ -50,7 +49,7 @@ interface RequestInterface extends MessageInterface
      * @param null|int $millitime when NULL uses current millitime
      * @return self
      */
-    public function setStartTime($millitime = null);
+    public function setStartTime($millitime = NULL);
 
     /**
      * Sets execution time of request in milliseconds
@@ -58,7 +57,7 @@ interface RequestInterface extends MessageInterface
      * @param int|null $millitime when passed, it would use passed millitime to overwrite execution time
      * @return self
      */
-    public function setExecutionTime($millitime = null);
+    public function setExecutionTime($millitime = NULL);
 
     /**
      * Gets execution time of request in milliseconds
@@ -86,7 +85,6 @@ interface RequestInterface extends MessageInterface
      * Set the URL of the request
      *
      * @param string $url Full URL to set including query string
-     *
      * @return self
      */
     public function setUrl($url);
@@ -124,7 +122,6 @@ interface RequestInterface extends MessageInterface
      * Set the port that the request will be sent on
      *
      * @param int $port Port number to set
-     *
      * @return self
      */
     public function setPort($port);
@@ -180,11 +177,10 @@ interface RequestInterface extends MessageInterface
      * @param bool $toArray when true, return as array
      * @return null|string|array
      */
-    public function getQuery($toArray = false);
+    public function getQuery($toArray = FALSE);
 
     /**
      * Checks to see if we have a proper message
-     *
      * This returns TRUE when message is valid
      * This returns CODE when message is invalid
      *

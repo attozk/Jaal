@@ -11,10 +11,9 @@ class Connection extends \Elastica\Connection
         return new React();
     }
 
-
-    public static function create($params = array())
+    public static function create($params = [])
     {
-        $connection = null;
+        $connection = NULL;
 
         if ($params instanceof Connection) {
             $connection = $params;

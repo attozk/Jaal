@@ -5,7 +5,8 @@ namespace Hathoora\Jaal\IO\React\SocketClient;
 use Hathoora\Jaal\Util\Time;
 use React\EventLoop\LoopInterface;
 
-class Stream extends \React\Stream\Stream {
+class Stream extends \React\Stream\Stream
+{
 
     /**
      * @var string unique identifier
@@ -37,18 +38,19 @@ class Stream extends \React\Stream\Stream {
      */
     public $resource;
 
-    public function __construct($stream, LoopInterface $loop) {
+    public function __construct($stream, LoopInterface $loop)
+    {
         parent::__construct($stream, $loop);
         $this->millitime = Time::millitime();
-        $this->id = stream_socket_get_name($stream, false);
-        $this->remoteId = stream_socket_get_name($stream, true);
+        $this->id = stream_socket_get_name($stream, FALSE);
+        $this->remoteId = stream_socket_get_name($stream, TRUE);
         $this->hits = 0;
     }
 
     public function getRemoteAddress()
     {
         if (empty($this->remoteAddress)) {
-            $this->remoteAddress = $this->parseAddress(stream_socket_get_name($this->stream, true));
+            $this->remoteAddress = $this->parseAddress(stream_socket_get_name($this->stream, TRUE));
         }
 
         return $this->remoteAddress;

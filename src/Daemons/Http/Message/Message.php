@@ -17,7 +17,7 @@ abstract class Message implements MessageInterface
     /**
      * @var array of HTTP headers
      */
-    protected $headers = array();
+    protected $headers = [];
 
     /**
      * @var string HTTP body
@@ -28,7 +28,6 @@ abstract class Message implements MessageInterface
      * Set the HTTP protocol version of the request (e.g. 1.1 or 1.0)
      *
      * @param string $protocol HTTP protocol version to use with the request
-     *
      * @return self
      */
     public function setProtocolVersion($protocol)
@@ -49,7 +48,8 @@ abstract class Message implements MessageInterface
     }
 
     /**
-     * HTTP headers are case-insensitive, we store all headers in lower case to ensure that we can perform matching operations
+     * HTTP headers are case-insensitive, we store all headers in lower case to ensure that we can perform matching
+     * operations
      *
      * @param $header
      * @return string
@@ -85,7 +85,7 @@ abstract class Message implements MessageInterface
     {
         $header = $this->normalizeHeader($header);
 
-        return isset($this->headers[$header]) ? $this->headers[$header] : null;
+        return isset($this->headers[$header]) ? $this->headers[$header] : NULL;
     }
 
     /**
@@ -166,20 +166,20 @@ abstract class Message implements MessageInterface
 
     /**
      * Returns end of message strategy based on headers
-     *
      * For message with Content-Length it returns length
      * For message with Transfer-Encoding : chunked it returns chunked
      *
-     * @return length|chunked|null
+     * @return string|null
      */
     public function getEOMStrategy()
     {
-        $method = null;
+        $method = NULL;
 
         if ($this->hasHeader('Content-Length')) {
             $method = 'length';
         } else {
-            if ($this->hasHeader('Transfer-Encoding') && preg_match('/chunked/', $this->getHeader('Transfer-Encoding'))) {
+            if ($this->hasHeader('Transfer-Encoding') && preg_match('/chunked/', $this->getHeader('Transfer-Encoding'))
+            ) {
                 $method = 'chunked';
             }
         }

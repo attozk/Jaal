@@ -18,10 +18,12 @@ class Time
         return sprintf('%d%03d', $comps[1], $comps[0] * 1000);
     }
 
-    public static function millitimeDiff($start, $now = null) {
+    public static function millitimeDiff($start, $now = NULL)
+    {
 
-        if (!$now)
+        if (!$now) {
             $now = self::millitime();
+        }
 
         return ($now - $start);
     }

@@ -16,11 +16,11 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     protected $response;
 
     /**
-     * @var ConnectionInterface
+     * @var ConnectionInterface|\Hathoora\Jaal\IO\React\Socket\Connection
      */
     protected $stream;
 
-    public function __construct($method, $url, $headers = array())
+    public function __construct($method, $url, $headers = [])
     {
         parent::__construct($method, $url, $headers);
     }
@@ -50,9 +50,10 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 
     /**
      * Reads incoming data (when more than buffer) to parse it into a message
+
      *
-     * @param ConnectionInterface $stream
-     * @param $data
+*@param ConnectionInterface $stream
+     * @param                     $data
      * @return void
      */
     public function handleIncomingData(ConnectionInterface $stream, $data)
@@ -62,7 +63,6 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         $EOM = $this->getEOMStrategy();
 
         if ($EOM == 'length') {
-
         }
     }
 
@@ -96,12 +96,13 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
      * @param null $message
      * @return mixed
      */
-    public function reply($code = null, $message = null)
+    public function reply($code = NULL, $message = NULL)
     {
         $this->setState(self::STATE_DONE);
 
-        if (!$this->response)
+        if (!$this->response) {
             $this->response = new Response($code);
+        }
 
         $this->prepareResponseHeaders();
 
@@ -119,12 +120,16 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
      */
     private function cleanup()
     {
-        Logger::getInstance()->log(-99, 'REPLY (' . $this->state . ') ' . Logger::getInstance()->color($this->getUrl(), 'red') .
-            ' using stream: ' . Logger::getInstance()->color($this->stream->id, 'green'));
+        Logger::getInstance()
+              ->log(-99,
+                    'REPLY (' . $this->state . ') ' . Logger::getInstance()->color($this->getUrl(), 'red') .
+                    ' using stream: ' . Logger::getInstance()->color($this->stream->id, 'green'));
 
         Jaal::getInstance()->getDaemon('httpd')->inboundIOManager->removeProp($this->stream, 'request');
 
-        if (!Jaal::getInstance()->config->get('httpd.keepalive.max') && !Jaal::getInstance()->config->get('httpd.keepalive.max')) {
+        if (!Jaal::getInstance()->config->get('httpd.keepalive.max') &&
+            !Jaal::getInstance()->config->get('httpd.keepalive.max')
+        ) {
             $this->stream->end();
         }
     }

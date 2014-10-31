@@ -6,38 +6,42 @@ use Hathoora\Jaal\Util\Time;
 
 abstract class IOManager
 {
-
     protected $streams = '';
 
-    public $stats = array(
-        'streams' => 0, // number of connections
-        'hits' => 0,    // number of requests
-        'bytes' => 0,
-        'concurrency' => array(/*
+    public $stats
+        = [
+            'streams'     => 0, // number of connections
+            'hits'        => 0,    // number of requests
+            'bytes'       => 0,
+            'concurrency' => [/*
              $id => array(
                 'ip' => $ip,
-                'resouse' => $resource
+                'resource' => $resource
              )
              */
-        )
-    );
+            ]
+        ];
 
+    /**
+     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
+     * @return $this
+     */
     public function add($stream)
     {
         $id = $stream->id;
         if (!isset($this->streams[$id])) {
 
-            $this->streams[$id] = array(
+            $this->streams[$id] = [
                 'stream' => $stream,
                 'lastActivity' => Time::millitime()
-            );
+            ];
 
             $this->stats['streams']++;
-            $this->stats['concurrency'][$id] = array(
+            $this->stats['concurrency'][$id] = [
                 'address' => $stream->remoteId,
                 'resource' => & $stream->resource,
-                'hits' => & $stream->hits
-            );
+                'hits'    => & $stream->hits
+            ];
 
             $stream->on('data', function ($data) use ($stream) {
                 $this->stats['bytes'] = strlen($data);
@@ -55,16 +59,25 @@ abstract class IOManager
 
     public function get($stream)
     {
-        $id = $stream->id;
+        $value = NULL;
+        $id    = $stream->id;
+
         if (isset($this->streams[$id])) {
-            return $this->streams[$id];
+            $value = $this->streams[$id];
         }
+
+        return $value;
     }
 
     public function getStreamById($id)
     {
-        if (isset($this->streams[$id]))
-            return $this->streams[$id]['stream'];
+        $value = NULL;
+
+        if (isset($this->streams[$id])) {
+            $value = $this->streams[$id]['stream'];
+        }
+
+        return $value;
     }
 
     public function remove($stream)
@@ -78,23 +91,47 @@ abstract class IOManager
     }
 
     /**
+     * Sets property for a stream that manager needs to keep track of
+     *
+     * @param        $stream
      * @param $property
      * @param $value
+     * @return self
      */
     public function setProp($stream, $property, $value)
     {
         $this->add($stream);
-        $id = $stream->id;
+        $id                            = $stream->id;
         $this->streams[$id][$property] = $value;
+
+        return $this;
     }
 
+    /**
+     * /**
+     * Gets property for a stream that manager needs to keep track of
+     *
+     * @param $stream
+     * @param $property
+     * @return null|mixed
+     */
     public function getProp($stream, $property)
     {
+        $value = NULL;
+
         if (($arr = $this->get($stream)) && isset($arr[$property])) {
-            return $arr[$property];
+            $value = $arr[$property];
         }
+
+        return $value;
     }
 
+    /**
+     * Remove property of a stream
+     *
+     * @param $stream
+     * @param $property
+     */
     public function removeProp($stream, $property)
     {
         if (isset($this->streams[$stream->id]) && isset($this->streams[$stream->id][$property])) {

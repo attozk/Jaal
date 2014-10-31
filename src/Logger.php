@@ -14,67 +14,72 @@ class Logger implements LoggerInterface
     /**
      * Minimum debug level
      */
-    private $levelWeights = array(
-        'DEBUG' => 0,
-        'INFO' => 1,
-        'NOTICE' => 2,
-        'WARNING' => 3,
-        'ERROR' => 4,
-        'CRITICAL' => 5,
-        'ALERT' => 6,
-        'EMERGENCY' => 7
-    );
+    private $levelWeights
+        = [
+            'DEBUG'     => 0,
+            'INFO'      => 1,
+            'NOTICE'    => 2,
+            'WARNING'   => 3,
+            'ERROR'     => 4,
+            'CRITICAL'  => 5,
+            'ALERT'     => 6,
+            'EMERGENCY' => 7
+        ];
 
     private $levelWeight = 4;
     private $colors;
 
-    private $arrColorsFG = array(
-        'black' => '0;30',
-        'darkGray' => '1;30',
-        'blue' => '0;34',
-        'lightBlue' => '1;34',
-        'green' => '0;32',
-        'lightGreen' => '1;32',
-        'cyan' => '0;36',
-        'lightCyan' => '1;36',
-        'red' => '0;31',
-        'lightRed' => '1;31',
-        'purple' => '0;35',
-        'lightPurple' => '1;35',
-        'brown' => '0;33',
-        'yellow' => '1;33',
-        'lightGray' => '0;37',
-        'white' => '1;37'
-    );
+    private $arrColorsFG
+        = [
+            'black'       => '0;30',
+            'darkGray'    => '1;30',
+            'blue'        => '0;34',
+            'lightBlue'   => '1;34',
+            'green'       => '0;32',
+            'lightGreen'  => '1;32',
+            'cyan'        => '0;36',
+            'lightCyan'   => '1;36',
+            'red'         => '0;31',
+            'lightRed'    => '1;31',
+            'purple'      => '0;35',
+            'lightPurple' => '1;35',
+            'brown'       => '0;33',
+            'yellow'      => '1;33',
+            'lightGray'   => '0;37',
+            'white'       => '1;37'
+        ];
 
-    private $arrColorsBG = array(
-        'black' => '40',
-        'red' => '41',
-        'green' => '42',
-        'yellow' => '43',
-        'blue' => '44',
-        'magenta' => '45',
-        'cyan' => '46',
-        'light_gray' => '47'
-    );
+    private $arrColorsBG
+        = [
+            'black'      => '40',
+            'red'        => '41',
+            'green'      => '42',
+            'yellow'     => '43',
+            'blue'       => '44',
+            'magenta'    => '45',
+            'cyan'       => '46',
+            'light_gray' => '47'
+        ];
 
     private function __construct()
     {
         $level = Jaal::getInstance()->config->get('jaal.debug.level');
 
-        if (is_numeric($level))
+        if (is_numeric($level)) {
             $this->levelWeight = $level;
-        else if (($level = strtoupper($level)) && isset($this->levelWeights[$level]))
+        } else if (($level = strtoupper($level)) && isset($this->levelWeights[$level])) {
             $this->levelWeight = $this->levelWeights[$level];
+        }
 
         $this->colors = Jaal::getInstance()->config->get('jaal.debug.colors');
     }
 
     // Returns colored string
-    public function color($string, $foreground_color = null, $background_color = null)
+    public function color($string, $foreground_color = NULL, $background_color = NULL)
     {
-        if (!$this->colors)
+        if (!$this->colors) {
             return $string;
+        }
 
         $colored_string = "";
 
@@ -95,41 +100,42 @@ class Logger implements LoggerInterface
 
     /**
      * System is unusable.
+
      *
-     * @param string $message
+*@param string $message
      * @param array $context
      * @return null
      */
-    public function emergency($message, array $context = array())
+    public function emergency($message, array $context = [])
     {
         $this->log('EMERGENCY', $message, $context);
     }
 
     /**
      * Action must be taken immediately.
-     *
      * Example: Entire website down, database unavailable, etc. This should
      * trigger the SMS alerts and wake you up.
+
      *
-     * @param string $message
+*@param string $message
      * @param array $context
      * @return null
      */
-    public function alert($message, array $context = array())
+    public function alert($message, array $context = [])
     {
         $this->log('ALERT', $message, $context);
     }
 
     /**
      * Critical conditions.
-     *
      * Example: Application component unavailable, unexpected exception.
+
      *
-     * @param string $message
+*@param string $message
      * @param array $context
      * @return null
      */
-    public function critical($message, array $context = array())
+    public function critical($message, array $context = [])
     {
         $this->log('CRITICAL', $message, $context);
     }
@@ -137,65 +143,68 @@ class Logger implements LoggerInterface
     /**
      * Runtime errors that do not require immediate action but should typically
      * be logged and monitored.
+
      *
-     * @param string $message
+*@param string $message
      * @param array $context
      * @return null
      */
-    public function error($message, array $context = array())
+    public function error($message, array $context = [])
     {
         $this->log('ERROR', $message, $context);
     }
 
     /**
      * Exceptional occurrences that are not errors.
-     *
      * Example: Use of deprecated APIs, poor use of an API, undesirable things
      * that are not necessarily wrong.
+
      *
-     * @param string $message
+*@param string $message
      * @param array $context
      * @return null
      */
-    public function warning($message, array $context = array())
+    public function warning($message, array $context = [])
     {
         $this->log('WARNING', $message, $context);
     }
 
     /**
      * Normal but significant events.
+
      *
-     * @param string $message
+*@param string $message
      * @param array $context
      * @return null
      */
-    public function notice($message, array $context = array())
+    public function notice($message, array $context = [])
     {
         $this->log('NOTICE', $message, $context);
     }
 
     /**
      * Interesting events.
-     *
      * Example: User logs in, SQL logs.
+
      *
-     * @param string $message
+*@param string $message
      * @param array $context
      * @return null
      */
-    public function info($message, array $context = array())
+    public function info($message, array $context = [])
     {
         $this->log('INFO', $message, $context);
     }
 
     /**
      * Detailed debug information.
+
      *
-     * @param string $message
+*@param string $message
      * @param array $context
      * @return null
      */
-    public function debug($message, array $context = array())
+    public function debug($message, array $context = [])
     {
         $this->log('DEBUG', $message, $context);
     }
@@ -203,14 +212,16 @@ class Logger implements LoggerInterface
     /**
      * Logs with an arbitrary level.
      *
-     * @param mixed $level
+     * @param mixed  $level
      * @param string $message
-     * @param array $context
+     * @param array  $context
      * @return null
      */
-    public function log($level, $message, array $context = array())
+    public function log($level, $message, array $context = [])
     {
-        if ((is_numeric($level) && $level >= $this->levelWeight) || (isset($this->levelWeights[$level]) && $this->levelWeights[$level] >= $this->levelWeight)) {
+        if ((is_numeric($level) && $level >= $this->levelWeight) ||
+            (isset($this->levelWeights[$level]) && $this->levelWeights[$level] >= $this->levelWeight)
+        ) {
             echo '[' . $level . '] ' . $message . "\n";
         }
     }

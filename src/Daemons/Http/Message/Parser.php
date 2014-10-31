@@ -2,11 +2,10 @@
 
 namespace Hathoora\Jaal\Daemons\Http\Message;
 
-use Hathoora\Jaal\Daemons\Http\Client\Request as ClientRequest;
+use Hathoora\Jaal\Daemons\Http\Client\RequestInterface as ClientRequestInterface;
 
 /**
  * This is the modified Parser class from Guzzle
- *
  * @url https://github.com/guzzle/guzzle
  */
 class Parser
@@ -15,35 +14,35 @@ class Parser
      * Parse an HTTP request message into an associative array of parts.
      *
      * @param string $message HTTP request to parse
-     *
      * @return array|bool Returns false if the message is invalid
      */
     public static function parseRequest($message)
     {
-        if (!($parts = self::parseMessage($message))) {
-            return false;
+        $parsed = FALSE;
+
+        if ($parts = self::parseMessage($message)) {
+
+            // Parse the protocol and protocol version
+            if (isset($parts['start_line'][2])) {
+                $startParts = explode('/', $parts['start_line'][2]);
+                $protocol   = strtoupper($startParts[0]);
+                $version    = isset($startParts[1]) ? $startParts[1] : '1.1';
+            } else {
+                $protocol = 'HTTP';
+                $version  = '1.1';
+            }
+
+            $parsed = [
+                'method'           => strtoupper($parts['start_line'][0]),
+                'protocol'         => $protocol,
+                'protocol_version' => $version,
+                'headers'          => $parts['headers'],
+                'body'             => $parts['body']
+            ];
+
+            $parsed['request_url'] = self::getUrlPartsFromMessage(
+                (isset($parts['start_line'][1]) ? $parts['start_line'][1] : ''), $parsed);
         }
-
-        // Parse the protocol and protocol version
-        if (isset($parts['start_line'][2])) {
-            $startParts = explode('/', $parts['start_line'][2]);
-            $protocol = strtoupper($startParts[0]);
-            $version = isset($startParts[1]) ? $startParts[1] : '1.1';
-        } else {
-            $protocol = 'HTTP';
-            $version = '1.1';
-        }
-
-        $parsed = [
-            'method' => strtoupper($parts['start_line'][0]),
-            'protocol' => $protocol,
-            'protocol_version' => $version,
-            'headers' => $parts['headers'],
-            'body' => $parts['body']
-        ];
-
-        $parsed['request_url'] = self::getUrlPartsFromMessage(
-            (isset($parts['start_line'][1]) ? $parts['start_line'][1] : ''), $parsed);
 
         return $parsed;
     }
@@ -52,12 +51,12 @@ class Parser
      * Returns a Client Request object after parsing the message
      *
      * @param $message
-     * @return bool|ClientRequest
+     * @return bool|ClientRequestInterface
      */
     public static function getClientRequest($message)
     {
         if (!($parsed = self::parseRequest($message))) {
-            return false;
+            return FALSE;
         }
 
         return (new ClientRequest($parsed['method'], '', $parsed['headers']))
@@ -75,27 +74,28 @@ class Parser
      * Parse an HTTP response message into an associative array of parts.
      *
      * @param string $message HTTP response to parse
-     *
      * @return array|bool Returns false if the message is invalid
      */
     public static function parseResponse($message)
     {
-        if (!($parts = self::parseMessage($message))) {
-            return false;
-        }
+        $response = FALSE;
 
-        if (isset($parts['start_line']) && is_array($parts['start_line']) && count($parts['start_line']) >= 3) {
+        if (($parts = self::parseMessage($message)) &&
+            (isset($parts['start_line']) && is_array($parts['start_line']) && count($parts['start_line']) >= 3)
+        ) {
             list($protocol, $version) = explode('/', trim($parts['start_line'][0]));
 
-            return [
-                'protocol' => $protocol,
+            $response = [
+                'protocol'         => $protocol,
                 'protocol_version' => $version,
-                'code' => $parts['start_line'][1],
-                'reason_phrase' => isset($parts['start_line'][2]) ? $parts['start_line'][2] : '',
-                'headers' => $parts['headers'],
-                'body' => $parts['body']
+                'code'             => $parts['start_line'][1],
+                'reason_phrase'    => isset($parts['start_line'][2]) ? $parts['start_line'][2] : '',
+                'headers'          => $parts['headers'],
+                'body'             => $parts['body']
             ];
         }
+
+        return $response;
     }
 
     /**
@@ -107,7 +107,7 @@ class Parser
     public static function getResponse($message)
     {
         if (!($parsed = self::parseResponse($message))) {
-            return false;
+            return FALSE;
         }
 
         return (new Response($parsed['code'], $parsed['headers']))
@@ -119,18 +119,17 @@ class Parser
      * Parse a message into parts
      *
      * @param string $message Message to parse
-     *
      * @return array|bool
      */
     private static function parseMessage($message)
     {
         if (!$message) {
-            return false;
+            return FALSE;
         }
 
-        $startLine = null;
-        $headers = [];
-        $body = '';
+        $startLine = NULL;
+        $headers   = [];
+        $body      = '';
 
         // Iterate over each line in the message, accounting for line endings
         $lines = preg_split('/(\\r?\\n)/', $message, -1, PREG_SPLIT_DELIM_CAPTURE);
@@ -151,7 +150,7 @@ class Parser
                 $startLine = explode(' ', $line, 3);
             } elseif (strpos($line, ':')) {
                 $parts = explode(':', $line, 2);
-                $key = trim($parts[0]);
+                $key   = trim($parts[0]);
                 $value = isset($parts[1]) ? trim($parts[1]) : '';
                 if (!isset($headers[$key])) {
                     $headers[$key] = $value;
@@ -165,8 +164,8 @@ class Parser
 
         return [
             'start_line' => $startLine,
-            'headers' => $headers,
-            'body' => $body
+            'headers'    => $headers,
+            'body'       => $body
         ];
     }
 
@@ -174,8 +173,7 @@ class Parser
      * Create URL parts from HTTP message parts
      *
      * @param string $requestUrl Associated URL
-     * @param array $parts HTTP message parts
-     *
+     * @param array  $parts      HTTP message parts
      * @return array
      */
     private static function getUrlPartsFromMessage($requestUrl, array $parts)
@@ -189,15 +187,15 @@ class Parser
         } elseif (isset($parts['headers']['host'])) {
             $urlParts['host'] = $parts['headers']['host'];
         } else {
-            $urlParts['host'] = null;
+            $urlParts['host'] = NULL;
         }
 
-        if (false === strpos($urlParts['host'], ':')) {
+        if (FALSE === strpos($urlParts['host'], ':')) {
             $urlParts['port'] = '';
         } else {
-            $hostParts = explode(':', $urlParts['host']);
+            $hostParts        = explode(':', $urlParts['host']);
             $urlParts['host'] = trim($hostParts[0]);
-            $urlParts['port'] = (int)trim($hostParts[1]);
+            $urlParts['port'] = (int) trim($hostParts[1]);
             if ($urlParts['port'] == 443) {
                 $urlParts['scheme'] = 'https';
             }
@@ -208,7 +206,7 @@ class Parser
         $qpos = strpos($path, '?');
         if ($qpos) {
             $urlParts['query'] = substr($path, $qpos + 1);
-            $urlParts['path'] = substr($path, 0, $qpos);
+            $urlParts['path']  = substr($path, 0, $qpos);
         } else {
             $urlParts['query'] = '';
         }

@@ -18,34 +18,34 @@ class Type extends \Elastica\Type
 
         $this->request($path, Request::GET)
             ->then(function ($response) use ($deferred) {
-                $mapping = array();
+                $mapping = [];
 
                 $data = $response->getData();
-                $arr = array_shift($data);
+                $arr  = array_shift($data);
 
                 if (isset($arr['mappings'])) {
                     $mapping = $arr['mappings'];
                 }
 
                 $deferred->resolve($mapping);
-
-            }, function () use ($deferred) {
+            },
+            function () use ($deferred) {
                 $deferred->reject();
             });
 
         return $deferred->promise();
     }
 
-
     /**
      * Makes calls to the elasticsearch server based on this type
      *
-     * @param  string $path Path to call
+     * @param  string $path   Path to call
      * @param  string $method Rest method to use (GET, POST, DELETE, PUT)
-     * @param  array $data OPTIONAL Arguments as array
-     * @param  array $query OPTIONAL Query params
+     * @param  array  $data   OPTIONAL Arguments as array
+     * @param  array  $query  OPTIONAL Query params
+     * @return \Elastica\Response
      */
-    public function request($path, $method, $data = array(), array $query = array())
+    public function request($path, $method, $data = [], array $query = [])
     {
         $path = $this->getName() . '/' . $path;
 

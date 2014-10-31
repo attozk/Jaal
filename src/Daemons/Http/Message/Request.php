@@ -7,7 +7,7 @@ use Hathoora\Jaal\Util\Time;
 class Request extends Message implements RequestInterface
 {
     /**
-     * @var unique id for request
+     * @var string unique id for request
      */
     public $id;
 
@@ -17,15 +17,16 @@ class Request extends Message implements RequestInterface
     protected $millitime;
 
     /**
-     * @var millitime it took to process this request
+     * @var int millitime it took to process this request
      */
     protected $took;
 
     /**
      * Stores URL parts to construct URL
+     *
      * @var array
      */
-    protected $urlParts = array();
+    protected $urlParts = [];
 
     /**
      * Cache busting for $url so it can be regenerated
@@ -33,7 +34,7 @@ class Request extends Message implements RequestInterface
      * @internal use getUrl() to get url
      * @var bool
      */
-    protected $urlPartsModified = true;
+    protected $urlPartsModified = TRUE;
 
     /**
      * Internal pseudo cache for storing getUrl()
@@ -45,7 +46,6 @@ class Request extends Message implements RequestInterface
 
     /**
      * Stores internal state of request
-     *
      * This is not to be mixed with HTTP Request/Response status code
      *
      * @var int
@@ -53,11 +53,11 @@ class Request extends Message implements RequestInterface
     protected $state;
 
     /**
-     * @param $method
-     * @param $url
+     * @param       $method
+     * @param       $url
      * @param array $headers
      */
-    public function __construct($method, $url, $headers = array())
+    public function __construct($method, $url, $headers = [])
     {
         $this->setMethod($method);
         $this->setUrl($url);
@@ -78,30 +78,27 @@ class Request extends Message implements RequestInterface
     }
 
     /**
-     * Set's interal state of request as it goes through various stages
+     * Set's internal state of request as it goes through various stages
      * When passed NULL it would automatically try to set appropriate state
-     *
      * This is not to be mixed with HTTP Request/Response status code
      *
      * @param null $state
      * @return self
      */
-    public function setState($state = null)
+    public function setState($state = NULL)
     {
         if (!$state) {
 
             $state = self::STATE_PENDING;
-            $EOM = $this->getEOMStrategy();
+            $EOM   = $this->getEOMStrategy();
 
-            if (!$EOM && $this->method == 'GET' && count($this->headers))
+            if (!$EOM && $this->method == 'GET' && count($this->headers)) {
                 $state = self::STATE_DONE;
-
-            // content length
+            } // content length
             else if ($EOM == 'length' && $this->method != 'GET' && strlen($this->body) == $this->getSize()) {
                 $state = self::STATE_DONE;
             } // @TODO handle chunked
             else if ($EOM == 'chunked') {
-
             }
         }
 
@@ -112,7 +109,6 @@ class Request extends Message implements RequestInterface
 
     /**
      * Returns internal state
-     *
      * This is not to be mixed with HTTP Request/Response status code
      *
      * @return mixed
@@ -130,7 +126,7 @@ class Request extends Message implements RequestInterface
      */
     public function getHeaderLines()
     {
-        $headers = array();
+        $headers = [];
         foreach ($this->headers as $key => $value) {
             if (is_array($value)) {
                 foreach ($value as $v) {
@@ -146,17 +142,17 @@ class Request extends Message implements RequestInterface
 
     /**
      * Returns raw HTTP Headers that usually initiate HTTP request
-     *
      * @url https://github.com/guzzle/guzzle
-     * @return sring
+     *
+     * @return string
      */
     public function getRawHeaders()
     {
-        $protocolVersion = $this->protocolVersion ?: '1.1';
+        $protocolVersion = $this->protocolVersion ? : '1.1';
 
         return trim($this->method . ' ' . $this->getResource()) . ' ' .
-        strtoupper(str_replace('https', 'http', $this->getScheme())) . '/' .
-        $protocolVersion . "\r\n" . implode("\r\n", $this->getHeaderLines());
+               strtoupper(str_replace('https', 'http', $this->getScheme())) . '/' .
+               $protocolVersion . "\r\n" . implode("\r\n", $this->getHeaderLines());
     }
 
     /**
@@ -165,7 +161,7 @@ class Request extends Message implements RequestInterface
      * @param null|int $millitime when NULL uses current millitime
      * @return self
      */
-    public function setStartTime($millitime = null)
+    public function setStartTime($millitime = NULL)
     {
         if (!$millitime) {
             $millitime = Time::millitime();
@@ -182,7 +178,7 @@ class Request extends Message implements RequestInterface
      * @param int|null $millitime when passed, it would use passed millitime to overwrite execution time
      * @return self
      */
-    public function setExecutionTime($millitime = null)
+    public function setExecutionTime($millitime = NULL)
     {
         if ($millitime) {
             $this->took = Time::millitimeDiff($this->millitime, $millitime);
@@ -230,14 +226,13 @@ class Request extends Message implements RequestInterface
      * Set the URL of the request
      *
      * @param string $url Full URL to set including query string
-     *
      * @return self
      */
     public function setUrl($url)
     {
-        $this->urlPartsModified = false;
-        $this->urlParts = parse_url($url);
-        $this->url = $url;
+        $this->urlPartsModified = FALSE;
+        $this->urlParts         = parse_url($url);
+        $this->url              = $url;
 
         return $this;
     }
@@ -251,18 +246,19 @@ class Request extends Message implements RequestInterface
     {
         if ($this->urlPartsModified) {
             $scheme = $this->getScheme();
-            $host = $this->getHost();
-            $port = $this->getPort();
+            $host   = $this->getHost();
+            $port   = $this->getPort();
             #$user     = isset($parsed_url['user']) ? $parsed_url['user'] : '';
             #$pass     = isset($parsed_url['pass']) ? ':' . $parsed_url['pass']  : '';
             #$pass     = ($user || $pass) ? "$pass@" : '';
-            $path = $this->getPath();
+            $path  = $this->getPath();
             $query = !empty($this->urlParts['query']) ? '?' . $this->urlParts['query'] : '';
 
-            if ($scheme == 'http' && $port != 80)
+            if ($scheme == 'http' && $port != 80) {
                 $port = ':' . $port;
-            else if ($scheme == 'https' && $port != 443)
+            } else if ($scheme == 'https' && $port != 443) {
                 $port = ':' . $port;
+            }
 
             $this->url = "$scheme://$host$port$path$query";
         }
@@ -277,7 +273,7 @@ class Request extends Message implements RequestInterface
      */
     public function getResource()
     {
-        $path = $this->getPath();
+        $path  = $this->getPath();
         $query = isset($this->urlParts['query']) ? '?' . $this->urlParts['query'] : '';
 
         return $path . $query;
@@ -287,13 +283,12 @@ class Request extends Message implements RequestInterface
      * Set the URI scheme of the request (http, https, ftp, etc)
      *
      * @param string $scheme Scheme to set
-     *
      * @return self
      */
     public function setScheme($scheme)
     {
         $this->urlParts['scheme'] = $scheme;
-        $this->urlPartsModified = true;
+        $this->urlPartsModified   = TRUE;
 
         return $this;
     }
@@ -305,20 +300,19 @@ class Request extends Message implements RequestInterface
      */
     public function getScheme()
     {
-        return isset($this->urlParts['scheme']) ? $this->urlParts['scheme'] : null;
+        return isset($this->urlParts['scheme']) ? $this->urlParts['scheme'] : NULL;
     }
 
     /**
      * Set the port that the request will be sent on
      *
      * @param int $port Port number to set
-     *
      * @return self
      */
     public function setPort($port)
     {
         $this->urlParts['port'] = $port;
-        $this->urlPartsModified = true;
+        $this->urlPartsModified = TRUE;
 
         return $this;
     }
@@ -330,7 +324,7 @@ class Request extends Message implements RequestInterface
      */
     public function getPort()
     {
-        return isset($this->urlParts['port']) ? $this->urlParts['port'] : null;
+        return isset($this->urlParts['port']) ? $this->urlParts['port'] : NULL;
     }
 
     /**
@@ -342,7 +336,7 @@ class Request extends Message implements RequestInterface
     public function setHost($host)
     {
         $this->urlParts['host'] = $host;
-        $this->urlPartsModified = true;
+        $this->urlPartsModified = TRUE;
 
         return $this;
     }
@@ -354,7 +348,7 @@ class Request extends Message implements RequestInterface
      */
     public function getHost()
     {
-        return isset($this->urlParts['host']) ? $this->urlParts['host'] : null;
+        return isset($this->urlParts['host']) ? $this->urlParts['host'] : NULL;
     }
 
     /**
@@ -366,7 +360,7 @@ class Request extends Message implements RequestInterface
     public function setPath($path)
     {
         $this->urlParts['path'] = $path;
-        $this->urlPartsModified = true;
+        $this->urlPartsModified = TRUE;
 
         return $this;
     }
@@ -378,7 +372,7 @@ class Request extends Message implements RequestInterface
      */
     public function getPath()
     {
-        return isset($this->urlParts['path']) ? $this->urlParts['path'] : null;
+        return isset($this->urlParts['path']) ? $this->urlParts['path'] : NULL;
     }
 
     /**
@@ -390,7 +384,7 @@ class Request extends Message implements RequestInterface
     public function setQuery($query)
     {
         $this->urlParts['query'] = $query;
-        $this->urlPartsModified = true;
+        $this->urlPartsModified  = TRUE;
 
         return $this;
     }
@@ -401,14 +395,17 @@ class Request extends Message implements RequestInterface
      * @param bool $toArray when true, return as array
      * @return null|string|array
      */
-    public function getQuery($toArray = false)
+    public function getQuery($toArray = FALSE)
     {
-        $query = null;
+        $query = NULL;
         if (isset($this->urlParts['query'])) {
             $query = $this->urlParts['query'];
 
-            if ($toArray)
-                $query = parse_str($query);
+            if ($toArray) {
+                $arr = [];
+                parse_str($query, $arr);
+                $query = $arr;
+            }
         }
 
         return $query;
@@ -416,7 +413,6 @@ class Request extends Message implements RequestInterface
 
     /**
      * Checks to see if we have a proper message
-     *
      * This returns TRUE when message is valid
      * This returns CODE when message is invalid
      *
@@ -424,10 +420,11 @@ class Request extends Message implements RequestInterface
      */
     public function isValid()
     {
-        $valid = true;
+        $valid = TRUE;
 
-        if ($this->body && !$this->hasHeader('Content-Length'))
+        if ($this->body && !$this->hasHeader('Content-Length')) {
             $valid = 400;
+        }
 
         return $valid;
     }

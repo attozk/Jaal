@@ -32,15 +32,18 @@ class InboundManager extends IOManager
 
     public function add($stream)
     {
-        $notAdded = false;
+        $notAdded = FALSE;
         if (!isset($this->streams[$stream->id])) {
-            $notAdded = true;
+            $notAdded = TRUE;
             Logger::getInstance()->log(-99, Logger::getInstance()->color($stream->id,
-                    'green') . ' / ' . $stream->remoteId . ' has been added to Inbound Manager, hits: ' . $stream->hits . ', connection time: ' . Time::millitimeDiff($stream->millitime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
-                    'lightCyan'));
+                                                                         'green') . ' / ' . $stream->remoteId .
+                                            ' has been added to Inbound Manager, hits: ' .
+                                            $stream->hits . ', connection time: ' .
+                                            Time::millitimeDiff($stream->millitime) . ' ms ' .
+                                            Logger::getInstance()->color('[' . __METHOD__ . ']',
+                                                                         'lightCyan'));
             parent::add($stream);
         }
-
 
         if ($notAdded) {
 
@@ -59,9 +62,14 @@ class InboundManager extends IOManager
                         }
 
                         Logger::getInstance()->log(-99, Logger::getInstance()->color($stream->id,
-                                'green') . ' connection timeout from Inbound Manager, hits: ' . $stream->hits . ', connection time: ' . Time::millitimeDiff($stream->millitime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
-                                'lightCyan'));
-                        $request->error(408);
+                                                                                     'green') .
+                                                        ' connection timeout from Inbound Manager, hits: ' .
+                                                        $stream->hits .
+                                                        ', connection time: ' .
+                                                        Time::millitimeDiff($stream->millitime) . ' ms ' .
+                                                        Logger::getInstance()->color('[' . __METHOD__ . ']',
+                                                                                     'lightCyan'));
+                        $request->reply(408);
                     }
                 });
                 $this->setProp($stream, 'timerTimeout', $timerTimeout);
@@ -71,14 +79,20 @@ class InboundManager extends IOManager
                         function () use ($stream) {
                             if ($request = $this->getProp($stream, 'request')) {
 
-                                if (($timerKeepaliveTimeout = $this->getProp($stream, 'timerKeepaliveTimeout')) && $timerKeepaliveTimeout instanceof TimerInterface) {
+                                if (($timerKeepaliveTimeout = $this->getProp($stream, 'timerKeepaliveTimeout')) &&
+                                    $timerKeepaliveTimeout instanceof TimerInterface
+                                ) {
                                     $this->loop->cancelTimer($timerKeepaliveTimeout);
                                 }
 
-
                                 Logger::getInstance()->log(-99, Logger::getInstance()->color($stream->id,
-                                        'green') . ' keep-alive timeout from Inbound Manager, hits: ' . $stream->hits . ', connection time: ' . Time::millitimeDiff($stream->millitime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
-                                        'lightCyan'));
+                                                                                             'green') .
+                                                                ' keep-alive timeout from Inbound Manager, hits: ' .
+                                                                $stream->hits .
+                                                                ', connection time: ' .
+                                                                Time::millitimeDiff($stream->millitime) . ' ms ' .
+                                                                Logger::getInstance()->color('[' . __METHOD__ . ']',
+                                                                                             'lightCyan'));
                                 $stream->end();
                             }
                         });
@@ -96,8 +110,12 @@ class InboundManager extends IOManager
         $id = $stream->id;
         if (isset($this->streams[$id])) {
             Logger::getInstance()->log(-99, Logger::getInstance()->color($stream->id,
-                    'green') . ' / ' . $stream->remoteId . ' has been removed from Inbound Manager, hits: ' . $stream->hits . ', connection time: ' . Time::millitimeDiff($stream->millitime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
-                    'lightCyan'));
+                                                                         'green') . ' / ' . $stream->remoteId .
+                                            ' has been removed from Inbound Manager, hits: ' .
+                                            $stream->hits . ', connection time: ' .
+                                            Time::millitimeDiff($stream->millitime) . ' ms ' .
+                                            Logger::getInstance()->color('[' . __METHOD__ . ']',
+                                                                         'lightCyan'));
         }
 
         return parent::remove($stream);

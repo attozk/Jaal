@@ -4,7 +4,7 @@ namespace Hathoora\Jaal\Daemons\Http\Message;
 
 class StatusCode
 {
-    public static $arrCodes = array(
+    public static $arrCodes = [
         100 => 'Continue',
         101 => 'Switching Protocols',
         102 => 'Processing',
@@ -63,5 +63,5 @@ class StatusCode
         508 => 'Loop Detected',
         510 => 'Not Extended',
         511 => 'Network Authentication Required',
-    );
+    ];
 }

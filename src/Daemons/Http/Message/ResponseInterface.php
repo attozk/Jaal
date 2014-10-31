@@ -5,10 +5,10 @@ namespace Hathoora\Jaal\Daemons\Http\Message;
 Interface ResponseInterface extends MessageInterface
 {
     /**
-     * @param $statusCode
+     * @param       $statusCode
      * @param array $headers
      */
-    public function __construct($statusCode, array $headers = array());
+    public function __construct($statusCode, array $headers = []);
 
     /**
      * Set HTTP status for response

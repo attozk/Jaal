@@ -9,7 +9,6 @@ use Ratchet\Http\HttpServer;
 use Ratchet\Server\IoServer;
 use Ratchet\Wamp\WampServer;
 use Ratchet\WebSocket\WsServer;
-use React\Dns\Resolver\Resolver;
 use React\EventLoop\Factory as LoopFactory;
 use React\EventLoop\LoopInterface;
 use React\Dns\Resolver\Factory as DnsFactory;
@@ -41,7 +40,8 @@ class Jaal
 
     /**
      * Path to conf.d
-     * @var
+     *
+*@var
      */
     protected $confDPath;
 
@@ -50,14 +50,15 @@ class Jaal
      */
     public $config;
 
-    /** @var  \Hathoora\Jaal\Daemons\Http\Server */
+    /** @var  \Hathoora\Jaal\Daemons\Http\Httpd */
     protected $httpd;
 
     /** @var  \Hathoora\Jaal\Daemons\Admin\WAMP */
     protected $admin;
 
     private function __construct()
-    {}
+    {
+    }
 
     public static function execute($docopt)
     {
@@ -69,9 +70,9 @@ class Jaal
 
     public function setup(LoopInterface $loop)
     {
-        $this->loop = $loop;
-        $this->configFilePath = realpath(__DIR__ .'/../conf.yml');
-        $this->confDPath = realpath(__DIR__ .'/../conf.d/');
+        $this->loop           = $loop;
+        $this->configFilePath = realpath(__DIR__ . '/../conf.yml');
+        $this->confDPath      = realpath(__DIR__ . '/../conf.d/');
         $this->initConfig();
 
         $dnsResolverFactory = new DnsFactory();
@@ -83,14 +84,15 @@ class Jaal
 
     public function initConfig()
     {
-        $configBuilder = new YamlFileConfigurationBuilder(array($this->configFilePath));
-        $this->config = $configBuilder->build();
+        $configBuilder = new YamlFileConfigurationBuilder([$this->configFilePath]);
+        $this->config  = $configBuilder->build();
     }
 
     public function initDaemons()
     {
-        if ($this->config->get('httpd') && ($port = $this->config->get('httpd.port')) && ($ip = $this->config->get('httpd.listen')))
-        {
+        if ($this->config->get('httpd') && ($port = $this->config->get('httpd.port')) &&
+            ($ip = $this->config->get('httpd.listen'))
+        ) {
             Logger::getInstance()->log(100, 'HTTPD listening on ' . $ip . ':' . $port);
             $socket = new SocketServer($this->loop);
             $this->httpd = new Httpd($this->loop, $socket, $this->dns);
@@ -101,12 +103,14 @@ class Jaal
                 print_r($this->httpd->stats());
 
                 echo date('Y-m-d H:i:s') . '----------------------------GC----------------------------' . "\n" .
-                    'Memory: ' . round(memory_get_usage() / 1024 / 1024, 2) . " MB\n" .
-                    'Peak Memory: ' . round(memory_get_peak_usage() / 1024 / 1024, 2) . "MB \n" . "\n\n";
+                     'Memory: ' . round(memory_get_usage() / 1024 / 1024, 2) . " MB\n" .
+                     'Peak Memory: ' . round(memory_get_peak_usage() / 1024 / 1024, 2) . "MB \n" . "\n\n";
             });
         }
 
-        if ($this->config->get('admin') && ($port = $this->config->get('admin.port')) && ($ip = $this->config->get('admin.listen'))) {
+        if ($this->config->get('admin') && ($port = $this->config->get('admin.port')) &&
+            ($ip = $this->config->get('admin.listen'))
+        ) {
 
             $this->admin = new WAMP($this->loop);
             Logger::getInstance()->log(100, 'Admin WAMP Server listening on ' . $ip . ':' . $port);
@@ -128,19 +132,20 @@ class Jaal
 
     /**
      * Load confD
-     * @TODO make this async
+     *
+*@TODO make this async
      */
     public function initConfD()
     {
-        $directory = new \RecursiveDirectoryIterator($this->confDPath);
+        $directory   = new \RecursiveDirectoryIterator($this->confDPath);
         $recIterator = new \RecursiveIteratorIterator($directory);
-        $regex = new \RegexIterator($recIterator, '/^.+\.php$/i');
+        $regex       = new \RegexIterator($recIterator, '/^.+\.php$/i');
 
         $httpd = $this->getDaemon('httpd');
-        foreach($regex as $item) {
+        foreach ($regex as $item) {
 
             $filePath = $item->getPathname();
-            Logger::getInstance()->debug('HTTPD config file loaded: '. $filePath);
+            Logger::getInstance()->debug('HTTPD config file loaded: ' . $filePath);
 
             include($filePath);
         }
@@ -152,10 +157,11 @@ class Jaal
      */
     public function getDaemon($name)
     {
-        $service = null;
+        $service = NULL;
 
-        if (isset($this->$name) && is_object($this->$name))
+        if (isset($this->$name) && is_object($this->$name)) {
             $service = $this->$name;
+        }
 
         return $service;
     }
@@ -168,5 +174,4 @@ class Jaal
 
         return static::$instance;
     }
-
 }

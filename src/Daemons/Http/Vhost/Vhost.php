@@ -3,10 +3,6 @@
 namespace Hathoora\Jaal\Daemons\Http\Vhost;
 
 use Dflydev\DotAccessConfiguration\Configuration;
-use Hathoora\Jaal\IO\Manager\OutboundManager;
-use Hathoora\Jaal\Daemons\Http\Upstream\Request as UpstreamRequest;
-use React\Promise\Deferred;
-use React\Stream\Stream;
 
 Class Vhost
 {
@@ -14,7 +10,6 @@ Class Vhost
      * // nginx inspired @http://nginx.org/en/docs/http/ngx_http_upstream_module.html#health_check
      * array (
      * 'keepalive' => 10,
-     *
      * //'strategy' => 'round-robin|sticky|least_conn|etc...',
      * 'servers' => array(
      * 'weight:name' => array(
@@ -48,30 +43,39 @@ Class Vhost
     public function init($arrConfig)
     {
         // additional headers passed to proxy (in addition to client's headers)
-        $arrProxySetHeaders = isset($arrConfig['proxy_set_header']) && is_array($arrConfig['proxy_set_header']) ? $arrConfig['proxy_set_header'] : [];
+        $arrProxySetHeaders = isset($arrConfig['proxy_set_header']) &&
+                              is_array($arrConfig['proxy_set_header']) ? $arrConfig['proxy_set_header'] : [];
 
         // add headers to response (i..e sent to the client)
-        $arrAddHeaders = isset($arrConfig['add_header']) && is_array($arrConfig['add_header']) ? $arrConfig['add_header'] : [];
+        $arrAddHeaders
+            = isset($arrConfig['add_header']) && is_array($arrConfig['add_header']) ? $arrConfig['add_header'] : [];
 
         // headers not passed from proxy server to client
-        $arrProxyHideHeaders = isset($arrConfig['proxy_hide_header']) && is_array($arrConfig['proxy_hide_header']) ? $arrConfig['proxy_hide_header'] : [];
+        $arrProxyHideHeaders = isset($arrConfig['proxy_hide_header']) &&
+                               is_array($arrConfig['proxy_hide_header']) ? $arrConfig['proxy_hide_header'] : [];
         foreach ($arrProxyHideHeaders as $header) {
-            $arrAddHeaders[$header] = false;
+            $arrAddHeaders[$header] = FALSE;
         }
 
         // keep alive?
-        if (isset($arrConfig['upstreams']) && isset($arrConfig['upstreams']['keepalive']) && !empty($arrConfig['upstreams']['keepalive']['timeout']) && isset($arrConfig['upstreams']['keepalive']['max'])) {
+        if (isset($arrConfig['upstreams']) && isset($arrConfig['upstreams']['keepalive']) &&
+            !empty($arrConfig['upstreams']['keepalive']['timeout']) &&
+            isset($arrConfig['upstreams']['keepalive']['max'])
+        ) {
             $arrProxySetHeaders['Connection'] = 'Keep-Alive';
-            $arrProxySetHeaders['Keep-Alive'] = 'timeout=' . $arrConfig['upstreams']['keepalive']['timeout'] . ', max=' . $arrConfig['upstreams']['keepalive']['max'];
+            $arrProxySetHeaders['Keep-Alive']
+                                              =
+                'timeout=' . $arrConfig['upstreams']['keepalive']['timeout'] . ', max=' .
+                $arrConfig['upstreams']['keepalive']['max'];
         } else {
             $arrProxySetHeaders['Connection'] = 'Close';
         }
 
         // the end product of all header's merging
-        $arrRequestHeaders = $arrProxySetHeaders;
+        $arrRequestHeaders  = $arrProxySetHeaders;
         $arrResponseHeaders = $arrAddHeaders;
 
-        $arrConfig['headers']['server_to_upstream_request'] = $arrRequestHeaders;
+        $arrConfig['headers']['server_to_upstream_request']  = $arrRequestHeaders;
         $arrConfig['headers']['upstream_to_client_response'] = $arrResponseHeaders;
 
         $this->config = new Configuration($arrConfig);
@@ -97,21 +101,22 @@ Class Vhost
     public function getUpstreamConnectorConfig()
     {
         $arrServer = $this->getAvailableUpstreamServer();
-        $ip = $arrServer['ip'];
-        $port = $arrServer['port'];
+        $ip        = $arrServer['ip'];
+        $port      = $arrServer['port'];
 
         $keepalive = $this->config->get('upstreams.keepalive.timeout');
 
-        if ($keepalive)
+        if ($keepalive) {
             $keepalive .= ':' . $this->config->get('upstreams.keepalive.max');
+        }
 
         $timeout = $this->config->get('upstreams.timeout');
 
         return [
-            'ip' => $ip,
-            'port' => $port,
+            'ip'        => $ip,
+            'port'      => $port,
             'keepalive' => $keepalive ? $keepalive : '',
-            'timeout' => $timeout ? $timeout : ''];
+            'timeout'   => $timeout ? $timeout : ''
+        ];
     }
-
 }

@@ -18,7 +18,7 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
     /**
      * Returns connection stream socket
      *
-     * @return ConnectionInterface
+     * @return ConnectionInterface|\Hathoora\Jaal\IO\React\Socket\Connection
      */
     public function getStream();
 
@@ -26,7 +26,7 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
      * Reads incoming data (when more than buffer) to parse it into a message
      *
      * @param ConnectionInterface $stream
-     * @param $data
+     * @param                     $data
      * @return void
      */
     public function handleIncomingData(ConnectionInterface $stream, $data);
@@ -53,5 +53,5 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
      * @param null $message
      * @return mixed
      */
-    public function reply($code = null, $message = null);
+    public function reply($code = NULL, $message = NULL);
 }

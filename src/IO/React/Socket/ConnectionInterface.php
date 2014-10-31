@@ -4,6 +4,8 @@ namespace Hathoora\Jaal\IO\React\Socket;
 
 Interface ConnectionInterface extends \React\Socket\ConnectionInterface
 {
-    // client is allowed to connect
+    /**
+     * @return \React\Promise\Promise
+     */
     public function isAllowed();
 }

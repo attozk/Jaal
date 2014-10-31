@@ -5,13 +5,12 @@ namespace Hathoora\Jaal\Daemons\Http\Message;
 interface MessageInterface
 {
     const URL_ENCODED = 'application/x-www-form-urlencoded; charset=utf-8';
-    const MULTIPART = 'multipart/form-data';
+    const MULTIPART   = 'multipart/form-data';
 
     /**
      * Set the HTTP protocol version of the request (e.g. 1.1 or 1.0)
      *
      * @param string $protocol HTTP protocol version to use with the request
-     *
      * @return self
      */
     public function setProtocolVersion($protocol);
@@ -88,11 +87,10 @@ interface MessageInterface
 
     /**
      * Returns end of message strategy based on headers
-     *
      * For message with Content-Length it returns length
      * For message with Transfer-Encoding : chunked it returns chunked
      *
-     * @return length|chunked|null
+     * @return string|null
      */
     public function getEOMStrategy();
 
