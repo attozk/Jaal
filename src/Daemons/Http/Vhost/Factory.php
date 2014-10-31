@@ -2,8 +2,6 @@
 
 namespace Hathoora\Jaal\Daemons\Http\Vhost;
 
-use Hathoora\Jaal\Jaal;
-
 class Factory
 {
     /**
@@ -14,6 +12,8 @@ class Factory
     public static $arrVhosts;
 
     /**
+     * Creates a Vhost factory
+     *
      * @param $arrConfig
      * @param $scheme
      * @param $host
@@ -23,10 +23,9 @@ class Factory
     public static function create($arrConfig, $scheme, $host, $port)
     {
         $uniqueName = $scheme . ':' . $host . ':' . $port;
-        $httpd = Jaal::getInstance()->getDaemon('httpd');
 
         if (!isset(self::$arrVhosts[$uniqueName])) {
-            $vhost = new Vhost($arrConfig);
+            $vhost                        = new Vhost($arrConfig);
             self::$arrVhosts[$uniqueName] = $vhost;
         } else {
             $vhost = self::$arrVhosts[$uniqueName];

@@ -15,8 +15,9 @@ interface RequestInterface extends MessageInterface
      * Set's interal state of request as it goes through various stages
      * When passed NULL it would automatically try to set appropriate state
      *
+     * This is not to be mixed with HTTP Request/Response status code
+     *
      * @param null $state
-     * @internal This is not to be mixed with HTTP Request/Response status code
      * @return self
      */
     public function setState($state = null);
@@ -24,7 +25,7 @@ interface RequestInterface extends MessageInterface
     /**
      * Returns internal state
      *
-     * @internal This is not to be mixed with HTTP Request/Response status code
+     * This is not to be mixed with HTTP Request/Response status code
      * @return mixed
      */
     public function getState();

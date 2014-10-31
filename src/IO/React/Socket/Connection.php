@@ -8,20 +8,43 @@ use React\Promise\Deferred;
 
 Class Connection extends \React\Socket\Connection implements ConnectionInterface
 {
-    public $militime;   // milli time at connect
+    /**
+     * @var string unique identifier
+     */
     public $id;
+
+    /**
+     * @var string unique remote identifier
+     */
     public $remoteId;
+
+    /**
+     * @var int millitime at connect
+     */
+    public $millitime;
+
+    /**
+     * @var string remote address
+     */
     public $remoteAddress;
+
+    /**
+     * @var int activity
+     */
     public $hits;
-    public $resource; // a unique resource identifier, for http its URL
+
+    /**
+     * @var string a resource e.g. for HTTP it is the URL
+     */
+    public $resource;
 
     public function __construct($stream, LoopInterface $loop)
     {
-        $this->militime = Time::millitime();
+        $this->millitime = Time::millitime();
         parent::__construct($stream, $loop);
-        $this->id = stream_socket_get_name($this->stream, true);
-        $this->remoteId = stream_socket_get_name($this->stream, false);
-        $this->hits = 0;
+        $this->id       = stream_socket_get_name($this->stream, TRUE);
+        $this->remoteId = stream_socket_get_name($this->stream, FALSE);
+        $this->hits     = 0;
     }
 
     public function getRemoteAddress()
@@ -41,7 +64,7 @@ Class Connection extends \React\Socket\Connection implements ConnectionInterface
     {
         // @TODO check for max & blacklisted IPs here..
         $deferred = new Deferred();
-        $promise = $deferred->promise();
+        $promise  = $deferred->promise();
 
         $deferred->resolve($this);
 

@@ -38,14 +38,14 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     /**
      * @var array
      */
-    private $handleUpstreamDataAtts = array(
+    private $handleUpstreamDataAtts = [
         'consumed' => 0,
         'length' => 0,
         'buffer' => '',
         'methodEOM' => '',
         'segments' => 0,
         'hasError' => false
-    );
+    ];
 
     /**
      * @param Vhost $vhost
@@ -61,10 +61,6 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         $this->setState(ClientRequestInterface::STATE_PENDING);
     }
 
-    public function getClientRequest()
-    {
-        return $this->clientRequest;
-    }
 
     /**
      * Prepares headers for the request which would be sent to upstream (from Jaal server)
@@ -93,25 +89,65 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         }
     }
 
-    protected function prepareClientResponseHeader()
+    /**
+     * Return  client's request
+     *
+     * @return ClientRequestInterface
+     */
+    public function getClientRequest()
     {
-        if ($this->clientRequest->getResponse()) {
-            $arrHeaders = $this->vhost->config->get('headers.upstream_to_client_response');
-
-            foreach ($arrHeaders as $header => $value) {
-                if ($value === false) {
-                    $this->clientRequest->getResponse()->removeHeader($header);
-                } else {
-                    $this->clientRequest->getResponse()->addHeader($header, $value);
-                }
-            }
-
-            $this->clientRequest->getResponse()->addHeader('Exec-Time', $this->clientRequest->getExecutionTime());
-            $this->clientRequest->getResponse()->addHeader('X-Exec-Time', $this->getExecutionTime());
-            $this->clientRequest->setExecutionTime();
-        }
+        return $this->clientRequest;
     }
 
+    /**
+     * Set outbound stream
+     *
+     * @param Stream $stream
+     * @return self
+     */
+    public function setStream(Stream $stream)
+    {
+        $this->stream = $stream;
+
+        return $this;
+    }
+
+    /**
+     * Returns connection stream socket
+     *
+     * @return ConnectorInterface
+     */
+    public function getStream()
+    {
+        return $this->stream;
+    }
+
+    /**
+     * Set upstream response
+     *
+     * @param ResponseInterface $response
+     * @return self
+     */
+    public function setResponse(ResponseInterface $response)
+    {
+        $this->response = $response;
+
+        return $this;
+    }
+
+    /**
+     * Get upstream response
+     *
+     * @return ResponseInterface
+     */
+    public function getResponse()
+    {
+        return $this->response;
+    }
+
+    /**
+     * Send's the request to upstream server
+     */
     public function send()
     {
         $this->setState(self::STATE_RETRIEVING);
@@ -218,16 +254,37 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     }
 
     /**
+     * Prepares client's reponse headers once upstream's response has been received
+     */
+    protected function prepareClientResponseHeader()
+    {
+        if ($this->clientRequest->getResponse()) {
+            $arrHeaders = $this->vhost->config->get('headers.upstream_to_client_response');
+
+            foreach ($arrHeaders as $header => $value) {
+                if ($value === false) {
+                    $this->clientRequest->getResponse()->removeHeader($header);
+                } else {
+                    $this->clientRequest->getResponse()->addHeader($header, $value);
+                }
+            }
+
+            $this->clientRequest->getResponse()->addHeader('Exec-Time', $this->clientRequest->getExecutionTime());
+            $this->clientRequest->getResponse()->addHeader('X-Exec-Time', $this->getExecutionTime());
+            $this->clientRequest->setExecutionTime();
+        }
+    }
+
+    /**
      * Upstream reply is client's request response
      *
      * @param null $code to overwrite upstream's response
      * @param null $message
-     * @return mixed
      */
     public function reply($code = null, $message = null)
     {
         $this->prepareClientResponseHeader();
-        $this->end();
+        $this->cleanup();
 
         $eventName = Jaal::getInstance()->getDaemon('httpd')->emitUpstreamResponseHandler($this, $code, $message);
 
@@ -237,39 +294,16 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         }
     }
 
-    private function end()
+    /**
+     * Cleanups internal registry
+     */
+    private function cleanup()
     {
         Logger::getInstance()->log(-99, 'UPSTREAM RESPONSE ('. $this->state .') ' . Logger::getInstance()->color($this->getUrl(), 'red') . ' using remote stream: '. Logger::getInstance()->color($this->stream->id, 'green'));
         Jaal::getInstance()->getDaemon('httpd')->outboundIOManager->removeProp($this->stream, 'request');
+
         if (!$this->vhost->config->get('upstreams.keepalive.max') && !$this->vhost->config->get('upstreams.keepalive.max')) {
             $this->stream->end();
         }
-    }
-
-    /**
-     * @return self
-     */
-    public function setStream(Stream $stream)
-    {
-        $this->stream = $stream;
-
-        return $this;
-    }
-
-    /**
-     * Returns connection stream socket
-     *
-     * @return ConnectorInterface
-     */
-    public function getStream()
-    {
-        return $this->stream;
-    }
-
-    public function setResponse(Response $response)
-    {
-        $this->response = $response;
-
-        return $this;
     }
 }

@@ -33,11 +33,6 @@ Class Vhost
     public $config;
 
     /**
-     * @var
-     */
-    public $arrUpstreamConnectors;
-
-    /**
      * @param $arrConfig
      */
     public function __construct($arrConfig)
@@ -45,16 +40,21 @@ Class Vhost
         $this->init($arrConfig);
     }
 
+    /**
+     * Sets configs, sets defaults and so on
+     *
+     * @param $arrConfig
+     */
     public function init($arrConfig)
     {
         // additional headers passed to proxy (in addition to client's headers)
-        $arrProxySetHeaders = isset($arrConfig['proxy_set_header']) && is_array($arrConfig['proxy_set_header']) ? $arrConfig['proxy_set_header'] : array();
+        $arrProxySetHeaders = isset($arrConfig['proxy_set_header']) && is_array($arrConfig['proxy_set_header']) ? $arrConfig['proxy_set_header'] : [];
 
         // add headers to response (i..e sent to the client)
-        $arrAddHeaders = isset($arrConfig['add_header']) && is_array($arrConfig['add_header']) ? $arrConfig['add_header'] : array();
+        $arrAddHeaders = isset($arrConfig['add_header']) && is_array($arrConfig['add_header']) ? $arrConfig['add_header'] : [];
 
         // headers not passed from proxy server to client
-        $arrProxyHideHeaders = isset($arrConfig['proxy_hide_header']) && is_array($arrConfig['proxy_hide_header']) ? $arrConfig['proxy_hide_header'] : array();
+        $arrProxyHideHeaders = isset($arrConfig['proxy_hide_header']) && is_array($arrConfig['proxy_hide_header']) ? $arrConfig['proxy_hide_header'] : [];
         foreach ($arrProxyHideHeaders as $header) {
             $arrAddHeaders[$header] = false;
         }
@@ -78,9 +78,9 @@ Class Vhost
     }
 
     /**
-     * Return a server based on load/health etc..
+     * Return a server
      *
-     * @return mixed
+     * @return array of server
      */
     public function getAvailableUpstreamServer()
     {
@@ -89,22 +89,29 @@ Class Vhost
         return array_pop($arrUpstreams['servers']);
     }
 
+    /**
+     * Return upstream configs that can be used to create a connector
+     *
+     * @return array
+     */
     public function getUpstreamConnectorConfig()
     {
         $arrServer = $this->getAvailableUpstreamServer();
         $ip = $arrServer['ip'];
         $port = $arrServer['port'];
+
         $keepalive = $this->config->get('upstreams.keepalive.timeout');
+
         if ($keepalive)
             $keepalive .= ':' . $this->config->get('upstreams.keepalive.max');
 
         $timeout = $this->config->get('upstreams.timeout');
 
-        return array(
+        return [
             'ip' => $ip,
             'port' => $port,
             'keepalive' => $keepalive ? $keepalive : '',
-            'timeout' => $timeout ? $timeout : '');
+            'timeout' => $timeout ? $timeout : ''];
     }
 
 }

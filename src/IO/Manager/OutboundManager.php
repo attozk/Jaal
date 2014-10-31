@@ -49,7 +49,7 @@ class OutboundManager extends IOManager
         if (!isset($this->streams[$stream->id])) {
 
             Logger::getInstance()->log(-99,
-                Logger::getInstance()->color($stream->remoteId, 'purple'). ' / '. Logger::getInstance()->color($stream->id, 'green') .' has been added to Outbound Manager, hits: ' . $stream->hits .', connection time: ' . Time::millitimeDiff($stream->militime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
+                Logger::getInstance()->color($stream->remoteId, 'purple'). ' / '. Logger::getInstance()->color($stream->id, 'green') .' has been added to Outbound Manager, hits: ' . $stream->hits .', connection time: ' . Time::millitimeDiff($stream->millitime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
                     'lightPurple'));
         }
 
@@ -64,7 +64,7 @@ class OutboundManager extends IOManager
         if (isset($this->streams[$id])) {
 
             Logger::getInstance()->log(-99,
-                Logger::getInstance()->color($stream->remoteId, 'purple'). ' / '. Logger::getInstance()->color($stream->id, 'green') .' has been removed from Outbound Manager, hits: ' . $stream->hits .', connection time: ' . Time::millitimeDiff($stream->militime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
+                Logger::getInstance()->color($stream->remoteId, 'purple'). ' / '. Logger::getInstance()->color($stream->id, 'green') .' has been removed from Outbound Manager, hits: ' . $stream->hits .', connection time: ' . Time::millitimeDiff($stream->millitime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
                     'lightPurple'));
         }
 

@@ -46,8 +46,9 @@ class Request extends Message implements RequestInterface
     /**
      * Stores internal state of request
      *
-     * @internal This is not to be mixed with HTTP Request/Response status code
-     * @var
+     * This is not to be mixed with HTTP Request/Response status code
+     *
+     * @var int
      */
     protected $state;
 
@@ -80,8 +81,9 @@ class Request extends Message implements RequestInterface
      * Set's interal state of request as it goes through various stages
      * When passed NULL it would automatically try to set appropriate state
      *
+     * This is not to be mixed with HTTP Request/Response status code
+     *
      * @param null $state
-     * @internal This is not to be mixed with HTTP Request/Response status code
      * @return self
      */
     public function setState($state = null)
@@ -111,7 +113,8 @@ class Request extends Message implements RequestInterface
     /**
      * Returns internal state
      *
-     * @internal This is not to be mixed with HTTP Request/Response status code
+     * This is not to be mixed with HTTP Request/Response status code
+     *
      * @return mixed
      */
     public function getState()
