@@ -17,6 +17,7 @@
         "react/socket-client": "0.4.*",
         "react/promise": "~2.0",
         "cboden/ratchet": "0.4.*@dev",
+        "attozk/evenement-plus": "dev-master",
         "symfony/yaml": "2.5.5",
         "dflydev/dot-access-configuration": "1.0.0",
         "psr/log": "dev-master",

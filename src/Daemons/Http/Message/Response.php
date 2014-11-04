@@ -37,8 +37,6 @@ Class Response extends Request implements ResponseInterface
     public function setStatusCode($code)
     {
         $this->statusCode = $code;
-        $reason           = isset(StatusCode::$arrCodes[$code]) ? StatusCode::$arrCodes[$code] : '';
-        $this->setReasonPhrase($reason);
 
         return $this;
     }
@@ -59,9 +57,17 @@ Class Response extends Request implements ResponseInterface
      * @param $phrase
      * @return self
      */
-    public function setReasonPhrase($phrase)
+    public function setReasonPhrase($phrase = '')
     {
-        $this->reasonPhrase = $phrase;
+        if ($phrase == '') {
+
+            $this->reasonPhrase =
+                isset(StatusCode::$arrCodes[$this->statusCode]) ? StatusCode::$arrCodes[$this->statusCode] : '';
+        }
+
+        if ($this->reasonPhrase) {
+            $this->body = '<h1>' . $this->statusCode . ' - ' . $this->reasonPhrase . '</h1>';
+        }
 
         return $this;
     }

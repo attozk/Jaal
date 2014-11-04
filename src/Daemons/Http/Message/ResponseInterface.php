@@ -31,7 +31,7 @@ Interface ResponseInterface extends MessageInterface
      * @param $phrase
      * @return self
      */
-    public function setReasonPhrase($phrase);
+    public function setReasonPhrase($phrase = '');
 
     /**
      * Get reason phrase

@@ -49,9 +49,9 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
     /**
      * Reply to client's request using $stream
      *
-     * @param null $code to overwrite request response
-     * @param null $message
+     * @param string $code    to overwrite response's status code
+     * @param string $message to overwrite response's body
      * @return mixed
      */
-    public function reply($code = NULL, $message = NULL);
+    public function reply($code = '', $message = '');
 }

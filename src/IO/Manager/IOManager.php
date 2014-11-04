@@ -38,9 +38,9 @@ abstract class IOManager
 
             $this->stats['streams']++;
             $this->stats['concurrency'][$id] = [
-                'address' => $stream->remoteId,
-                'resource' => & $stream->resource,
-                'hits'    => & $stream->hits
+                'address'  => &$stream->remoteId,
+                'resource' => &$stream->resource,
+                'hits'     => &$stream->hits
             ];
 
             $stream->on('data', function ($data) use ($stream) {
@@ -108,7 +108,6 @@ abstract class IOManager
     }
 
     /**
-     * /**
      * Gets property for a stream that manager needs to keep track of
      *
      * @param $stream
@@ -125,6 +124,29 @@ abstract class IOManager
 
         return $value;
     }
+
+    /**
+     * Appents property for a stream that manager needs to keep track of
+     *
+     * @param        $stream
+     * @param        $property
+     * @param string $data
+     * @return self
+     */
+    public function appendProp($stream, $property, $data)
+    {
+        $value = NULL;
+        $arr   = $this->get($stream);
+
+        if (isset($arr[$property])) {
+            $value .= $data;
+        } else {
+            $value = $data;
+        }
+
+        return $this;
+    }
+
 
     /**
      * Remove property of a stream

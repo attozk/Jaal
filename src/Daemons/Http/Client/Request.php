@@ -50,9 +50,8 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 
     /**
      * Reads incoming data (when more than buffer) to parse it into a message
-
      *
-*@param ConnectionInterface $stream
+     * @param ConnectionInterface $stream
      * @param                     $data
      * @return void
      */
@@ -92,32 +91,33 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     /**
      * Reply to client's request using $stream
      *
-     * @param null $code to overwrite request response
-     * @param null $message
+     * @param string $code    to overwrite response's status code
+     * @param string $message to overwrite response's body
      * @return mixed
      */
-    public function reply($code = NULL, $message = NULL)
+    public function reply($code = '', $message = '')
     {
         $this->setState(self::STATE_DONE);
+        $responseCreated = FALSE;
 
         if (!$this->response) {
             $this->response = new Response($code);
+            $this->response->setReasonPhrase($message);
+            $responseCreated = TRUE;
         }
 
         $this->prepareResponseHeaders();
 
-        if ($code) {
+        if ($code && $responseCreated === FALSE) {
             $this->response->setStatusCode($code);
             $this->response->setReasonPhrase($message);
         }
 
-        $eventName = Jaal::getInstance()->getDaemon('httpd')->emitClientResponseHandler($this);
+        Jaal::getInstance()->getDaemon('httpd')->emitClientResponseHandler($this);
 
         // by default spit the message out
-        if (!Jaal::getInstance()->getDaemon('httpd')->listeners($eventName)) {
-            $this->stream->write($this->response->getRawHeaders() . "\r\n" . $this->response->getBody());
-            $this->cleanup();
-        }
+        $this->stream->write($this->response->getRawHeaders() . "\r\n" . $this->response->getBody());
+        $this->cleanup();
     }
 
     /**
@@ -137,6 +137,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         ) {
             $this->stream->end();
         }
+        //unset($this);
     }
 
     /**
@@ -145,13 +146,19 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     private function prepareResponseHeaders()
     {
         $keepAliveTimeout = Jaal::getInstance()->config->get('httpd.keepalive.timeout');
-        $keepAliveMax = Jaal::getInstance()->config->get('httpd.keepalive.max');
+        $keepAliveMax     = Jaal::getInstance()->config->get('httpd.keepalive.max');
 
-        if ($keepAliveTimeout && $keepAliveMax) {
+        if ($this->response->getProtocolVersion() != $this->getProtocolVersion()) {
+            $this->response->getProtocolVersion() = $this->getProtocolVersion();
+        }
+
+        if ($this->getHeader('connection') != 'close' && $keepAliveTimeout && $keepAliveMax) {
             $this->response->addHeader('Connection', 'keep-alive');
             $this->response->addHeader('Keep-Alive', 'timeout=' . $keepAliveTimeout . ', max=' . $keepAliveMax);
         } else {
             $this->response->addHeader('Connection', 'close');
         }
+
+        $this->response->addHeader('Server', Jaal::name);
     }
 }

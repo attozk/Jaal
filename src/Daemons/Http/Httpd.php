@@ -2,6 +2,7 @@
 
 namespace Hathoora\Jaal\Daemons\Http;
 
+use Evenement\EventEmitter;
 use Hathoora\Jaal\Daemons\Http\Message\Parser;
 use Hathoora\Jaal\Daemons\Http\Client\RequestInterface as ClientRequestInterface;
 use Hathoora\Jaal\Daemons\Http\Message\RequestInterface;
@@ -15,7 +16,6 @@ use Hathoora\Jaal\IO\React\Socket\ConnectionInterface;
 use Hathoora\Jaal\IO\React\Socket\Server as SocketServer;
 use Hathoora\Jaal\IO\React\SocketClient\Stream;
 use Hathoora\Jaal\Logger;
-use Evenement\EventEmitter;
 use Hathoora\Jaal\Util\Time;
 use React\EventLoop\LoopInterface;
 use React\Dns\Resolver\Resolver;
@@ -64,7 +64,6 @@ class Httpd extends EventEmitter implements HttpdInterface
         $this->dns               = $dns;
         $this->inboundIOManager  = new InboundManager($this->loop, 'http');
         $this->outboundIOManager = new OutboundManager($this->loop, $dns, 'http');
-        $this->listen();
         $this->handleClientConnection();
     }
 
@@ -89,7 +88,6 @@ class Httpd extends EventEmitter implements HttpdInterface
             $this->inboundIOManager->add($client);
 
             $client->isAllowed($client)->then(
-
                 function ($client) {
                     $client->on('data', function ($data) use ($client) {
                         $this->handleClientRequestData($client, $data);
@@ -109,17 +107,24 @@ class Httpd extends EventEmitter implements HttpdInterface
     {
         $request = NULL;
 
+        //In order to remain persistent, all messages on a connection need to have a self-defined message length
+        //(i.e., one not defined by closure of the connection), as described in Section 3.3. A server MUST read the entire
+        //request message body or close the connection after sending its response, since otherwise the remaining data on a
+        //persistent connection would be misinterpreted as the next request. Likewise, a client MUST read the entire
+        //response message body if it intends to reuse the same connection for a subsequent request.
+
         if (!$this->inboundIOManager->getProp($client, 'request')) {
 
             $request = Parser::getClientRequest($data);
             $request->setStartTime()
                     ->setStream($client);
 
-            Logger::getInstance()->log(-50,
-                'REQUEST ' . $request->getMethod() . ' ' . Logger::getInstance()->color($request->getUrl(),
-                    'red') . ' using stream: ' . Logger::getInstance()->color($client->id,
-                    'green') . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
-                    'yellow'));
+            Logger::getInstance()
+                  ->log(-50,
+                        "\n\n" . 'REQUEST ' . $request->getMethod() . ' ' .
+                        Logger::getInstance()->color($request->getUrl(), 'red') .
+                        ' using stream: ' . Logger::getInstance()->color($client->id, 'green') . ' ' .
+                        Logger::getInstance()->color('[' . __METHOD__ . ']', 'yellow'));
 
             $client->resource = $request->getUrl();
             $client->hits++;
@@ -127,11 +132,13 @@ class Httpd extends EventEmitter implements HttpdInterface
 
             if ($client->hits > 1) {
                 Logger::getInstance()->log(-99,
-                    Logger::getInstance()->color($client->id, 'green') . ' keep-alive requested ' . $request->getUrl() .
-                    ', hits: ' . $client->hits . ', idle: ' .
-                    Time::millitimeDiff($this->inboundIOManager->getProp($client,
-                        'lastActivity')) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
-                        'lightCyan'));
+                                           Logger::getInstance()->color($client->id, 'green') .
+                                           ' keep-alive requested ' . $request->getUrl() .
+                                           ', hits: ' . $client->hits . ', idle: ' .
+                                           Time::millitimeDiff($this->inboundIOManager->getProp($client,
+                                                                                                'lastActivity')) .
+                                           ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
+                                                                                 'lightCyan'));
             }
 
             $this->inboundIOManager->setProp($client, 'request', $request);
@@ -143,7 +150,12 @@ class Httpd extends EventEmitter implements HttpdInterface
         }
 
         if ($request && $request->isValid() === TRUE) {
-            $this->emitClientRequestHandler($request);
+
+            $fallback = function () use ($request) {
+                $request->reply(404);
+                $request->getStream()->end();
+            };
+            $this->emitClientRequestHandler($request, $fallback);
         } else {
             Logger::getInstance()->log('ERROR', 'Unable to handle client request.');
             $client->end();
@@ -162,67 +174,47 @@ class Httpd extends EventEmitter implements HttpdInterface
         if ($request = $this->outboundIOManager->getProp($stream, 'request')) {
             $request->handleUpstreamOutputData($stream, $data);
         } else {
-            die('handleUpstreamRequestData error');
+            echo('handleUpstreamRequestData error' . "\n---->" . $data . "<--" . strlen($data) . "---\n\n");
         }
     }
 
     /**
      * After handling incoming client's request data, this method notifies to take action
+
      *
-     * @param ClientRequestInterface $request
-     * @emit client.request:HOST:PORT
-     * @emit client.request:PORT        emitted if no listeners for above event are listening
-     * @return string
+*@param ClientRequestInterface $request
+     * @param callable         $fallbackCallback when no listeners found, use this callback
+     * @emit request.HOST:PORT
      */
-    public function emitClientRequestHandler(ClientRequestInterface $request)
+    public function emitClientRequestHandler(ClientRequestInterface $request, callable $fallbackCallback = NULL)
     {
-        $event     = 'client.request:';
-        $emitEvent = $event . $request->getHost() . ':' . $request->getPort();
+        $emitEvent = 'request.' . $request->getHost() . ':' . $request->getPort();
 
-        if (count($this->listeners($emitEvent))) {
-            Logger::getInstance()
-                  ->log(-99,
-                      'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
-            $this->emit($emitEvent, [$request]);
-        } else {
-            $emitEvent = $event . $request->getPort();
-            Logger::getInstance()
-                  ->log(-99,
-                      'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
-            $this->emit($emitEvent, [$request]);
-        }
+        Logger::getInstance()
+              ->log(-99,
+                    'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
 
-        return $emitEvent;
+        $this->emit($emitEvent, [$request], $fallbackCallback);
     }
 
     /**
      * After receiving client's request response and about to reply back to client, this function notifies to take any
      * action.
+
      *
-     * @param ClientRequestInterface $request
-     * @emit client.response:HOST:PORT
-     * @emit client.response:PORT        emitted if no listeners for above event are listening
-     * @return string
+*@param ClientRequestInterface $request
+     * @param callable         $fallbackCallback when no listeners found, use this callback
+     * @emit response:HOST:PORT
      */
-    public function emitClientResponseHandler(ClientRequestInterface $request)
+    public function emitClientResponseHandler(ClientRequestInterface $request, callable $fallbackCallback = null)
     {
-        $event = 'client.response:';
-        $emitEvent = $event . $request->getHost() . ':' . $request->getPort();
+        $emitEvent = 'response.' . $request->getHost() . ':' . $request->getPort();
 
-        if (count($this->listeners($emitEvent))) {
-            Logger::getInstance()
-                  ->log(-99,
-                      'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
-            $this->emit($emitEvent, [$request]);
-        } else {
-            $emitEvent = $event . $request->getPort();
-            Logger::getInstance()
-                  ->log(-99,
-                      'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
-            $this->emit($emitEvent, [$request]);
-        }
+        Logger::getInstance()
+              ->log(-99,
+                    'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
 
-        return $emitEvent;
+        $this->emit($emitEvent, [$request], $fallbackCallback);
     }
 
     /**
@@ -235,14 +227,19 @@ class Httpd extends EventEmitter implements HttpdInterface
     {
         $vhost = NULL;
         Logger::getInstance()->log(-50,
-            'PROXY ' . $clientRequest->getMethod() . ' ' . Logger::getInstance()->color($clientRequest->getUrl(),
-                'red') . ' using stream: ' . Logger::getInstance()->color($clientRequest->getStream()->id,
-                'green') . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
-                'yellow'));
+                                   'PROXY ' . $clientRequest->getMethod() . ' ' .
+                                   Logger::getInstance()->color($clientRequest->getUrl(),
+                                                                'red') . ' using stream: ' .
+                                   Logger::getInstance()->color($clientRequest->getStream()->id,
+                                                                'green') . ' ' .
+                                   Logger::getInstance()->color('[' . __METHOD__ . ']',
+                                                                'yellow'));
 
         if (is_array($vhostConfig)) {
-            $vhost = VhostFactory::create($vhostConfig, $clientRequest->getScheme(), $clientRequest->getHost(),
-                $clientRequest->getPort());
+            $vhost = VhostFactory::create($vhostConfig,
+                                          $clientRequest->getScheme(),
+                                          $clientRequest->getHost(),
+                                          $clientRequest->getPort());
         } else if ($vhostConfig instanceof Vhost) {
             $vhost = $vhostConfig;
         }
@@ -274,7 +271,8 @@ class Httpd extends EventEmitter implements HttpdInterface
                 $stream->on('data', function ($data) use ($stream) {
                     $this->handleUpstreamRequestData($stream, $data);
                 });
-            }, function ($error) use ($clientRequest) {
+            },
+            function ($error) use ($clientRequest) {
 
                 $clientRequest->reply(500);
             }

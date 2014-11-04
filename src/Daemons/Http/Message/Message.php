@@ -158,7 +158,6 @@ abstract class Message implements MessageInterface
      *
      * @return mixed
      */
-
     public function getBody()
     {
         return $this->body;

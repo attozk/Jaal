@@ -301,5 +301,6 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         ) {
             $this->stream->end();
         }
+        //unset($this);
     }
 }

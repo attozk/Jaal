@@ -104,8 +104,8 @@ class OutboundManager extends IOManager
         $connector = NULL;
         $deferred  = new Deferred();
         $promise   = $deferred->promise();
+        $id = $this->removeIp2StreamMapping($key);
 
-        /*
         if ($keepalive && ($stream = $this->getStreamById($id))) {
 
             $status = $this->getProp($stream, 'status');
@@ -121,19 +121,19 @@ class OutboundManager extends IOManager
                 $stream = null;
                 $this->removeIp2StreamMapping($key);
             }
-        }*/
+        }
 
         if (!$stream) {
 
             $connector = new Connector($this->loop, $this->dns);
             $connector->create($ip, $port)->then(function (Stream $stream) use ($deferred, $key) {
-                    //$this->addIp2StreamMapping($key, $stream);
+                    $this->addIp2StreamMapping($key, $stream);
                     $this->setProp($stream, 'status', 'connected');
                     $deferred->resolve($stream);
                 },
                 function ($error) use ($deferred, $key) {
 
-                    //$this->removeIp2StreamMapping($key);
+                    $this->removeIp2StreamMapping($key);
                     Logger::getInstance()->log('NOTICE', 'Unable to connect to remote server: ' . $key);
 
                     $deferred->reject();
