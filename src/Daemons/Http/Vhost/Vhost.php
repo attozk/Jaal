@@ -47,12 +47,10 @@ Class Vhost
                               is_array($arrConfig['proxy_set_header']) ? $arrConfig['proxy_set_header'] : [];
 
         // add headers to response (i..e sent to the client)
-        $arrAddHeaders
-            = isset($arrConfig['add_header']) && is_array($arrConfig['add_header']) ? $arrConfig['add_header'] : [];
+        $arrAddHeaders = isset($arrConfig['add_header']) && is_array($arrConfig['add_header']) ? $arrConfig['add_header'] : [];
 
         // headers not passed from proxy server to client
-        $arrProxyHideHeaders = isset($arrConfig['proxy_hide_header']) &&
-                               is_array($arrConfig['proxy_hide_header']) ? $arrConfig['proxy_hide_header'] : [];
+        $arrProxyHideHeaders = isset($arrConfig['proxy_hide_header']) && is_array($arrConfig['proxy_hide_header']) ? $arrConfig['proxy_hide_header'] : [];
         foreach ($arrProxyHideHeaders as $header) {
             $arrAddHeaders[$header] = FALSE;
         }

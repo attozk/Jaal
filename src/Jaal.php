@@ -92,9 +92,7 @@ class Jaal
 
     public function initDaemons()
     {
-        if ($this->config->get('httpd') && ($port = $this->config->get('httpd.port')) &&
-            ($ip = $this->config->get('httpd.listen'))
-        ) {
+        if ($this->config->get('httpd') && ($port = $this->config->get('httpd.port')) && ($ip = $this->config->get('httpd.listen'))) {
             Logger::getInstance()->log(100, 'HTTPD listening on ' . $ip . ':' . $port);
             $socket = new SocketServer($this->loop);
             $this->httpd = new Httpd($this->loop, $socket, $this->dns);
@@ -113,26 +111,24 @@ class Jaal
             //});
         }
 
-        //if ($this->config->get('admin') && ($port = $this->config->get('admin.port')) &&
-        //    ($ip = $this->config->get('admin.listen'))
-        //) {
-        //
-        //    $this->admin = new WAMP($this->loop);
-        //    Logger::getInstance()->log(100, 'Admin WAMP Server listening on ' . $ip . ':' . $port);
-        //
-        //    $socket = new SocketServer($this->loop);
-        //    $socket->listen($port, $ip);
-        //    new IoServer(
-        //        new HttpServer(
-        //            new WsServer(
-        //                new WampServer(
-        //                    $this->admin
-        //                )
-        //            )
-        //        ),
-        //        $socket
-        //    );
-        //}
+        if ($this->config->get('admin') && ($port = $this->config->get('admin.port')) && ($ip = $this->config->get('admin.listen'))) {
+
+            $this->admin = new WAMP($this->loop);
+            Logger::getInstance()->log(100, 'Admin WAMP Server listening on ' . $ip . ':' . $port);
+
+            $socket = new SocketServer($this->loop);
+            $socket->listen($port, $ip);
+            new IoServer(
+                new HttpServer(
+                    new WsServer(
+                        new WampServer(
+                            $this->admin
+                        )
+                    )
+                ),
+                $socket
+            );
+        }
     }
 
     /**

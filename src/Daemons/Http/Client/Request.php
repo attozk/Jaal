@@ -148,9 +148,9 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         $keepAliveTimeout = Jaal::getInstance()->config->get('httpd.keepalive.timeout');
         $keepAliveMax     = Jaal::getInstance()->config->get('httpd.keepalive.max');
 
-        if ($this->response->getProtocolVersion() != $this->getProtocolVersion()) {
-            $this->response->getProtocolVersion() = $this->getProtocolVersion();
-        }
+        #if ($this->response->getProtocolVersion() != $this->getProtocolVersion()) {
+        #    $this->response->setProtocolVersion($this->getProtocolVersion());
+        #}
 
         if ($this->getHeader('connection') != 'close' && $keepAliveTimeout && $keepAliveMax) {
             $this->response->addHeader('Connection', 'keep-alive');

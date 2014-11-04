@@ -85,7 +85,7 @@ class Httpd extends EventEmitter implements HttpdInterface
     {
         $this->socket->on('connection', function (ConnectionInterface $client) {
 
-            $this->inboundIOManager->add($client);
+            $this->inboundIOManager->add($client)->newQueue($client, 'requests');
 
             $client->isAllowed($client)->then(
                 function ($client) {
@@ -112,6 +112,17 @@ class Httpd extends EventEmitter implements HttpdInterface
         //request message body or close the connection after sending its response, since otherwise the remaining data on a
         //persistent connection would be misinterpreted as the next request. Likewise, a client MUST read the entire
         //response message body if it intends to reuse the same connection for a subsequent request.
+
+        $request = Parser::getClientRequest($data);
+
+        $request = Parser::getClientRequest($data);
+
+        if (Parser::hasReachedEOM($this, $client, $data)) {
+
+
+            $this->inboundIOManager->add($client)->newQueue($client, 'requests');
+        }
+
 
         if (!$this->inboundIOManager->getProp($client, 'request')) {
 
@@ -182,7 +193,7 @@ class Httpd extends EventEmitter implements HttpdInterface
      * After handling incoming client's request data, this method notifies to take action
 
      *
-*@param ClientRequestInterface $request
+     * @param ClientRequestInterface $request
      * @param callable         $fallbackCallback when no listeners found, use this callback
      * @emit request.HOST:PORT
      */
@@ -190,9 +201,7 @@ class Httpd extends EventEmitter implements HttpdInterface
     {
         $emitEvent = 'request.' . $request->getHost() . ':' . $request->getPort();
 
-        Logger::getInstance()
-              ->log(-99,
-                    'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
+        Logger::getInstance()->log(-99, 'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
 
         $this->emit($emitEvent, [$request], $fallbackCallback);
     }
@@ -202,7 +211,7 @@ class Httpd extends EventEmitter implements HttpdInterface
      * action.
 
      *
-*@param ClientRequestInterface $request
+     * @param ClientRequestInterface $request
      * @param callable         $fallbackCallback when no listeners found, use this callback
      * @emit response:HOST:PORT
      */
@@ -236,10 +245,7 @@ class Httpd extends EventEmitter implements HttpdInterface
                                                                 'yellow'));
 
         if (is_array($vhostConfig)) {
-            $vhost = VhostFactory::create($vhostConfig,
-                                          $clientRequest->getScheme(),
-                                          $clientRequest->getHost(),
-                                          $clientRequest->getPort());
+            $vhost = VhostFactory::create($vhostConfig, $clientRequest->getScheme(), $clientRequest->getHost(), $clientRequest->getPort());
         } else if ($vhostConfig instanceof Vhost) {
             $vhost = $vhostConfig;
         }

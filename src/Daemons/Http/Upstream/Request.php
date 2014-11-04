@@ -84,6 +84,9 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
                 $this->addHeader($header, $value);
             }
         }
+
+        // @TODO added for testing only..
+        $this->removeHeader('accept-encoding');
     }
 
     /**
@@ -186,6 +189,12 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
                               $data .
                               "\n" . '----------- /Request Read: ' . $this->id . ' -----------' . "\n");
 
+            #echo "---------------------------\n";
+            #echo preg_replace_callback( "/(\n|\r)/", function($match) {
+            #    return ($match[1] == "\n" ? '\n' . "\n" : '\r');
+            #}, $data);
+            #echo "---------------------------\n";
+
             // @TODO no need to parse entire message, just look for content-length
 
             if (strlen($data)) {
@@ -196,9 +205,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
                 if ($response->hasHeader('Content-Length')) {
                     $length    = $response->getHeader('Content-Length');
                     $methodEOM = 'length';
-                } else if ($response->hasHeader('Transfer-Encoding') &&
-                           ($header = $response->getHeader('Transfer-Encoding')) && $header == 'chunked'
-                ) {
+                } else if ($response->hasHeader('Transfer-Encoding') && ($header = $response->getHeader('Transfer-Encoding')) && $header == 'chunked') {
                     $methodEOM = 'chunk';
                 } else {
                     $hasError = 400;
