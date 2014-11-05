@@ -90,6 +90,18 @@ Class Connection extends \React\Socket\Connection implements ConnectionInterface
 
     /**
      * @param $key
+     * @param $value
+     * @return $this
+     */
+    public function appendMeta($key, $value)
+    {
+        $this->meta[$key] .= $value;
+
+        return $this;
+    }
+
+    /**
+     * @param $key
      * @return null
      */
     public function getMeta($key)

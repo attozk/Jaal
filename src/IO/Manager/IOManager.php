@@ -23,7 +23,7 @@ abstract class IOManager
         ];
 
     /**
-     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
+     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
      * @return $this
      */
     public function add($stream)
@@ -58,7 +58,7 @@ abstract class IOManager
     }
 
     /**
-     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
+     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
      * @return null|array
      */
     public function get($stream)
@@ -89,7 +89,7 @@ abstract class IOManager
     }
 
     /**
-     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
+     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
      * @return $this
      */
     public function remove($stream)
@@ -103,7 +103,7 @@ abstract class IOManager
     }
 
     /**
-     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
+     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
      * @param $propertyName
      * @return SplQueue
      */
@@ -122,7 +122,7 @@ abstract class IOManager
     }
 
     /**
-     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
+     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
      * @param $propertyName
      * @return null|\SplQueue
      */

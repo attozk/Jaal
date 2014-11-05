@@ -4,12 +4,90 @@ namespace Hathoora\Jaal\Daemons\Http\Message;
 
 interface RequestInterface extends MessageInterface
 {
-    const STATE_PENDING    = 0;
-    const STATE_CONNECTING = 1;
-    const STATE_RETRIEVING = 2;
-    const STATE_FINALIZING = 5;
-    const STATE_ERROR      = 7;
-    const STATE_DONE       = 9;
+    /**
+     * Message is corrupt
+     */
+    const STATE_ERROR      = -10;
+
+    /**
+     * Error in parsing message
+     */
+    const STATE_PARSING_ERROR = -1;
+
+    /**
+     * Request has not been yet been parsed
+     * i.e. we are waiting on from stream to send data so we can start parsing
+     */
+    const STATE_PARSING_PENDING    = 0;
+
+    /**
+     * We have started parsing data and trying to figure out EOM (end of message)
+     */
+    const STATE_PARSING_PROCESSING    = 1;
+
+    /**
+     * After parsing we have reached EOM
+     */
+    const STATE_PARSING_EOM    = 2;
+
+    /**
+     * Message is ready to be processed i.e. either to be sent to upstream server/local docroot
+     */
+    const STATE_PENDING    = 10;
+
+    /**
+     * We connected to upstream server/read from local
+     */
+    const STATE_CONNECTED = 12;
+
+    /**
+     * We are sending data to client/upstream server
+     */
+    const STATE_SENDING = 13;
+
+    /**
+     * After getting connected, we have started reading data from stream/local docroot
+     */
+    const STATE_RETRIEVING = 14;
+
+    /**
+     * We got all the data from client/upstream/local docroot
+     */
+    const STATE_EOM = 18;
+
+    /**
+     * Everything is done with this message client got the reply, we should close it
+     */
+    const STATE_DONE       = 20;
+
+    /**
+     * Sets the parsing state, which is different from $this->state
+     * @param $state
+     * @return $this
+     */
+    public function setStateParsing($state);
+
+    /**
+     * Gets the parsing state, which is different from $this->state
+     */
+    public function getStateParsing();
+
+    /**
+     * Gets the parsing attribute from $$parsingAttrs
+     *
+     * @param $key
+     * @return null
+     */
+    public function getParsingAttr($key);
+
+    /**
+     * Sets the parsing attrs
+     *
+     * @param $key
+     * @param $value
+     * @return self
+     */
+    public function setParsingAttr($key, $value);
 
     /**
      * Set's internal state of request as it goes through various stages

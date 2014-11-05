@@ -5,6 +5,7 @@ namespace Hathoora\Jaal\Daemons\Http;
 use Evenement\EventEmitter;
 use Hathoora\Jaal\Daemons\Http\Message\Parser;
 use Hathoora\Jaal\Daemons\Http\Client\RequestInterface as ClientRequestInterface;
+use Hathoora\Jaal\Daemons\Http\Client\Request as ClientRequest;
 use Hathoora\Jaal\Daemons\Http\Message\RequestInterface;
 use Hathoora\Jaal\Daemons\Http\Upstream\Request as UpstreamRequest;
 use Hathoora\Jaal\Daemons\Http\Upstream\RequestInterface as UpstreamRequestInterface;
@@ -78,6 +79,35 @@ class Httpd extends EventEmitter implements HttpdInterface
         $this->socket->listen($port, $host);
     }
 
+
+
+
+
+
+
+    #######################################################################################
+    ##
+    ##              Inbound Client Code
+    ##  Following code is for requests coming to jaal server from clients (or browsers)
+    ##
+    /**
+     * Helper method for adding a new request property and setup various elements
+     * @param ConnectionInterface $client
+     */
+    protected function inboundIOManagerAddNewRequestProperty(ConnectionInterface $client)
+    {
+        $request = new ClientRequest();
+        $request->setStartTime()
+                ->setStateParsing(ClientRequestInterface::STATE_PARSING_PENDING)
+                ->setStream($client);
+
+        $client->hits++;
+        $this->inboundIOManager->add($client)
+            ->newQueue($client, 'requests')
+            ->setProp($client, 'request', $request)
+            ->stats['hits']++;
+    }
+
     /**
      * This method handles client connections
      */
@@ -85,12 +115,13 @@ class Httpd extends EventEmitter implements HttpdInterface
     {
         $this->socket->on('connection', function (ConnectionInterface $client) {
 
-            $this->inboundIOManager->add($client);
+            $this->inboundIOManagerAddNewRequestProperty($client);
 
             $client->isAllowed($client)->then(
                 function ($client) {
                     $client->on('data', function ($data) use ($client) {
-                        $this->handleClientRequestData($client, $data);
+
+                        $this->handleClientInboundRequestData($client, $data);
                     });
                 }
             );
@@ -103,87 +134,70 @@ class Httpd extends EventEmitter implements HttpdInterface
      * @param ConnectionInterface|\Hathoora\Jaal\IO\React\Socket\Connection $client
      * @param                                                               $data
      */
-    protected function handleClientRequestData(ConnectionInterface $client, $data)
+    protected function handleClientInboundRequestData(ConnectionInterface $client, $data)
     {
-        $request = NULL;
+        $errorCode = 0;
 
-        $request = Parser::getClientRequest($this->inboundIOManager, $client, $data);
-        die('a');
+        /** @var $request ClientRequest */
+        if ($request = $this->inboundIOManager->getProp($client, 'request')) {
 
-        //In order to remain persistent, all messages on a connection need to have a self-defined message length
-        //(i.e., one not defined by closure of the connection), as described in Section 3.3. A server MUST read the entire
-        //request message body or close the connection after sending its response, since otherwise the remaining data on a
-        //persistent connection would be misinterpreted as the next request. Likewise, a client MUST read the entire
-        //response message body if it intends to reuse the same connection for a subsequent request.
+            /**
+             * $status values:
+             * NULL     being processed
+             * TRUE     when reached EOM
+             * INT      when error code
+             */
+            $status = $request->handleInboundData($data);
 
-        if (!$this->inboundIOManager->getProp($client, 'request')) {
-
-            $request = Parser::getClientRequest($data);
-            $request->setStartTime()
-                    ->setStream($client);
-
-            Logger::getInstance()
-                  ->log(-50,
-                        "\n\n" . 'REQUEST ' . $request->getMethod() . ' ' .
-                        Logger::getInstance()->color($request->getUrl(), 'red') .
-                        ' using stream: ' . Logger::getInstance()->color($client->id, 'green') . ' ' .
-                        Logger::getInstance()->color('[' . __METHOD__ . ']', 'yellow'));
-
-            $client->resource = $request->getUrl();
-            $client->hits++;
-            $this->inboundIOManager->stats['hits']++;
-
-            if ($client->hits > 1) {
-                Logger::getInstance()->log(-99,
-                                           Logger::getInstance()->color($client->id, 'green') .
-                                           ' keep-alive requested ' . $request->getUrl() .
-                                           ', hits: ' . $client->hits . ', idle: ' .
-                                           Time::millitimeDiff($this->inboundIOManager->getProp($client,
-                                                                                                'lastActivity')) .
-                                           ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
-                                                                                 'lightCyan'));
+            if (is_int($status) && $request->getState() == ClientRequestInterface::STATE_ERROR) {
+                $errorCode = $status;
             }
+            // Request is ready to emit and/or EOM
+            else if ($request->getParsingAttr('packets') == 1 || $request->getStateParsing() == ClientRequestInterface::STATE_PARSING_EOM)
+            {
+                ## emit request readiness
+                if ($request->getParsingAttr('packets') == 1) {
+                    Logger::getInstance()->log(-50, "\n\n" . 'REQUEST ' . $request->getMethod() . ' ' . Logger::getInstance()->color($request->getUrl(), 'red') .
+                                                    ' using stream: ' . Logger::getInstance()->color($client->id, 'green') . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'yellow'));
 
-            $this->inboundIOManager->setProp($client, 'request', $request);
-        } else {
-            /** @var $request ClientRequestInterface */
-            if ($request = $this->inboundIOManager->getProp($client, 'request')) {
-                $request->handleIncomingData($client, $data);
+                    $fallback = function () use ($request) {
+                        $request->reply(404, '', true);
+                    };
+
+                    $this->emitClientRequestHandler($request, $fallback);
+
+                    // for admin stats
+                    $client->resource = $request->getUrl();
+                }
+
+                ## we reached EOM, lets be prepared to parse a new request on the same channel
+                if ($status === true) {
+                    $this->inboundIOManagerAddNewRequestProperty($client);
+
+                    /**
+                        In order to remain persistent, all messages on a connection need to have a self-defined message length
+                        (i.e., one not defined by closure of the connection), as described in Section 3.3. A server MUST read the entire
+                        request message body or close the connection after sending its response, since otherwise the remaining data on a
+                        persistent connection would be misinterpreted as the next request. Likewise, a client MUST read the entire
+                        response message body if it intends to reuse the same connection for a subsequent request.
+                    */
+                    $this->inboundIOManager->getQueue($client, 'requests')
+                                           ->enqueue($request);
+                }
             }
         }
-
-        if ($request && $request->isValid() === TRUE) {
-
-            $fallback = function () use ($request) {
-                $request->reply(404);
-                $request->getStream()->end();
-            };
-            $this->emitClientRequestHandler($request, $fallback);
-        } else {
-            Logger::getInstance()->log('ERROR', 'Unable to handle client request.');
-            $client->end();
+        else {
+            $errorCode = 450;
         }
-    }
 
-    /**
-     * Similar to handleClientRequestData, this method handle's response data from upstream and makes sense of it
-     *
-     * @param Stream $stream
-     * @param        $data
-     */
-    protected function handleUpstreamRequestData(Stream $stream, $data)
-    {
-        /** @var $request \Hathoora\Jaal\Daemons\Http\Upstream\RequestInterface */
-        if ($request = $this->outboundIOManager->getProp($stream, 'request')) {
-            $request->handleUpstreamOutputData($stream, $data);
-        } else {
-            echo('handleUpstreamRequestData error' . "\n---->" . $data . "<--" . strlen($data) . "---\n\n");
+        // we need to close this connection manually even when keep-alive
+        if ($errorCode) {
+            $request->reply($errorCode, '', true);
         }
     }
 
     /**
      * After handling incoming client's request data, this method notifies to take action
-
      *
      * @param ClientRequestInterface $request
      * @param callable         $fallbackCallback when no listeners found, use this callback
@@ -192,32 +206,21 @@ class Httpd extends EventEmitter implements HttpdInterface
     public function emitClientRequestHandler(ClientRequestInterface $request, callable $fallbackCallback = NULL)
     {
         $emitEvent = 'request.' . $request->getHost() . ':' . $request->getPort();
-
         Logger::getInstance()->log(-99, 'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
-
         $this->emit($emitEvent, [$request], $fallbackCallback);
     }
 
-    /**
-     * After receiving client's request response and about to reply back to client, this function notifies to take any
-     * action.
 
-     *
-     * @param ClientRequestInterface $request
-     * @param callable         $fallbackCallback when no listeners found, use this callback
-     * @emit response:HOST:PORT
-     */
-    public function emitClientResponseHandler(ClientRequestInterface $request, callable $fallbackCallback = null)
-    {
-        $emitEvent = 'response.' . $request->getHost() . ':' . $request->getPort();
 
-        Logger::getInstance()
-              ->log(-99,
-                    'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
 
-        $this->emit($emitEvent, [$request], $fallbackCallback);
-    }
 
+
+
+    #######################################################################################
+    ##
+    ##              Outbound Upstream Code
+    ##  Following code is for requests going from jaal server outside to upstream server/docroot
+    ##
     /**
      * For proxy-ing client's request to upstream
      *
@@ -227,18 +230,14 @@ class Httpd extends EventEmitter implements HttpdInterface
     public function proxy($vhostConfig, ClientRequestInterface $clientRequest)
     {
         $vhost = NULL;
-        Logger::getInstance()->log(-50,
-                                   'PROXY ' . $clientRequest->getMethod() . ' ' .
-                                   Logger::getInstance()->color($clientRequest->getUrl(),
-                                                                'red') . ' using stream: ' .
-                                   Logger::getInstance()->color($clientRequest->getStream()->id,
-                                                                'green') . ' ' .
-                                   Logger::getInstance()->color('[' . __METHOD__ . ']',
-                                                                'yellow'));
+        Logger::getInstance()->log(-50, 'PROXY ' . $clientRequest->getMethod() . ' ' .Logger::getInstance()->color($clientRequest->getUrl(), 'red') .
+            ' using stream: ' .Logger::getInstance()->color($clientRequest->getStream()->id, 'green') . ' ' .
+            Logger::getInstance()->color('[' . __METHOD__ . ']', 'yellow'));
 
         if (is_array($vhostConfig)) {
             $vhost = VhostFactory::create($vhostConfig, $clientRequest->getScheme(), $clientRequest->getHost(), $clientRequest->getPort());
-        } else if ($vhostConfig instanceof Vhost) {
+        }
+        else if ($vhostConfig instanceof Vhost) {
             $vhost = $vhostConfig;
         }
 
@@ -249,32 +248,90 @@ class Httpd extends EventEmitter implements HttpdInterface
         $keepalive = $arrUpstreamConfig['keepalive'];
         $timeout   = $arrUpstreamConfig['timeout'];
 
-        $upstreamRequest = new UpstreamRequest($vhost, $clientRequest);
-        $upstreamRequest->setBody($clientRequest->getBody());
-
         $this->outboundIOManager->buildConnector($ip, $port, $keepalive, $timeout)->then(
+            function (Stream $stream) use ($vhost, $clientRequest) {
 
-            function (Stream $stream) use ($upstreamRequest) {
-
-                $stream->hits++;
-                $stream->resource = $upstreamRequest->getUrl();
-                $this->outboundIOManager->stats['hits']++;
-                $this->outboundIOManager->setProp($stream, 'request', $upstreamRequest);
-
-                $upstreamRequest->setStartTime()
-                                ->setStream($stream)
-                                ->setState(RequestInterface::STATE_CONNECTING)
-                                ->send();
+                $this->outboundIOManagerAddNewRequestProperty($stream, $vhost, $clientRequest);
 
                 $stream->on('data', function ($data) use ($stream) {
-                    $this->handleUpstreamRequestData($stream, $data);
+                    $this->handleUpstreamInboundRequestData($stream, $data);
                 });
             },
             function ($error) use ($clientRequest) {
 
-                $clientRequest->reply(500);
+                // we need to close this connection manually even when keep-alive
+                $clientRequest->reply(500, '', true);
             }
         );
+    }
+
+    /**
+     * Helper method for adding a new request property and setup various elements
+     *
+     * @param Stream $stream
+     * @param Vhost $vhost
+     * @param ClientRequestInterface $clientRequest
+     */
+    protected function outboundIOManagerAddNewRequestProperty(Stream $stream, $vhost, $clientRequest)
+    {
+        $upstreamRequest = new UpstreamRequest($vhost, $clientRequest);
+        $upstreamRequest->setStartTime()
+                        ->setStream($stream)
+                        ->setState(UpstreamRequestInterface::STATE_CONNECTED)
+                        ->setStateParsing(ClientRequestInterface::STATE_PARSING_PENDING)
+                        ->send();
+
+        $stream->hits++;
+        $this->outboundIOManager->add($stream)
+            ->setProp($stream, 'request', $upstreamRequest)
+            ->stats['hits']++;
+    }
+
+    /**
+     * Similar to handleClientInboundRequestData, this method handle's response data from upstream and makes sense of it
+     *
+     * @param Stream $stream
+     * @param        $data
+     */
+    protected function handleUpstreamInboundRequestData(Stream $stream, $data)
+    {
+        $errorCode = 0;
+
+        /** @var $request UpstreamRequestInterface */
+        if ($request = $this->inboundIOManager->getProp($stream, 'request')) {
+
+            /**
+             * $status values:
+             * NULL     being processed
+             * TRUE     when reached EOM
+             * INT      when error code
+             */
+            $status = $request->handleInboundData($data);
+
+            if (is_int($status) && $request->getState() == UpstreamRequestInterface::STATE_ERROR) {
+                $errorCode = $status;
+            }
+            // response is ready (has reached EOM)
+            else if ($status === true && $request->getStateParsing() == UpstreamRequestInterface::STATE_PARSING_EOM)
+            {
+                ## we reached EOM, lets be prepared to parse a new request on the same channel
+                if ($status === true) {
+
+
+                    echo "UPSTREAM EOM \n";
+
+                    //$this->inboundIOManagerAddNewRequestProperty($client);
+                }
+            }
+        }
+        else {
+            $errorCode = 450;
+        }
+
+        // we need to close this connection manually even when keep-alive
+        if ($errorCode) {
+            $request->reply($errorCode, '', true);
+        }
     }
 
     /**
@@ -287,4 +344,23 @@ class Httpd extends EventEmitter implements HttpdInterface
             'outbound' => $this->outboundIOManager->stats()
         ];
     }
+
+
+
+//    /**
+//     * After receiving client's request response and about to reply back to client, this function notifies to take any
+//     * action.
+//
+//     *
+//     * @param ClientRequestInterface $request
+//     * @param callable         $fallbackCallback when no listeners found, use this callback
+//     * @emit response:HOST:PORT
+//     */
+//    public function emitClientResponseHandler(ClientRequestInterface $request, callable $fallbackCallback = null)
+//    {
+//        $emitEvent = 'response.' . $request->getHost() . ':' . $request->getPort();
+//        Logger::getInstance()->log(-99, 'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
+//        $this->emit($emitEvent, [$request], $fallbackCallback);
+//    }
+
 }

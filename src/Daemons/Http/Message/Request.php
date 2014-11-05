@@ -53,6 +53,27 @@ class Request extends Message implements RequestInterface
     protected $state;
 
     /**
+     * Similar to $state, but it used only for parsing of message (from/to stream)
+     *
+     * @var int
+     */
+    protected $stateParsing;
+
+    /**
+     * Messaging parsing attributes
+     * @var array
+     */
+    protected $parsingAttrs = [
+        'state' => '',
+        'consumed'  => 0,
+        'methodEOM' => '',
+        'contentLength'    => 0,
+        'packets'  => 0,        // how many packets it took for entire message
+        'buffer'    => '',
+        'errorCode'  => 0       // stores error code e.g. 400
+    ];
+
+    /**
      * @param       $method
      * @param       $url
      * @param array $headers
@@ -63,7 +84,6 @@ class Request extends Message implements RequestInterface
         $this->setUrl($url);
         $this->setRequestId();
         $this->addHeaders($headers);
-        $this->prepareParseVariables();
     }
 
     /**
@@ -74,6 +94,72 @@ class Request extends Message implements RequestInterface
     protected function setRequestId()
     {
         $this->id = uniqid('Request_');
+
+        return $this;
+    }
+
+    /**
+     * Sets the parsing state, which is different from $this->stats
+     * @param $state
+     * @return $this
+     */
+    public function setStateParsing($state)
+    {
+        $this->stateParsing = $state;
+
+        return $this;
+    }
+
+    /**
+     * Sets the parsing state, which is different from $this->stats
+     */
+    public function getStateParsing()
+    {
+        return $this->stateParsing;
+    }
+
+    /**
+     * Resets parsing attributes, this is usually done at the end of STATE_PARSING_EOM
+     *
+     * @return celd
+     */
+    protected function resetParsingAttrs()
+    {
+        $this->parsingAttrs = [
+            'state' => '',
+            'consumed'  => 0,
+            'methodEOM' => '',
+            'contentLength'    => 0,
+            'packets'  => 0,
+            'buffer'    => '',
+            'errorCode'  => 0
+        ];
+
+        return $this;
+    }
+
+
+    /**
+     * Gets the parsing attribute from $$parsingAttrs
+     *
+     * @param $key
+     * @return null
+     */
+    public function getParsingAttr($key)
+    {
+        return isset($this->parsingAttrs[$key]) ? $this->parsingAttrs[$key] : null;
+    }
+
+    /**
+     * Sets the parsing attrs
+     *
+     * @param $key
+     * @param $value
+     * @return self
+     */
+    public function setParsingAttr($key, $value)
+    {
+        $this->parsingAttrs[$key] = $value;
 
         return $this;
     }

@@ -50,68 +50,6 @@ class Parser
     }
 
     /**
-     * Returns a Client Request object after parsing the message
-     *
-     * @param $message
-     * @return bool|ClientRequestInterface|ClientRequest
-     */
-    public static function getClientRequest($ioManager, $client, $data)
-    {
-        $consumed      = $client->getMeta('http_message_consumed');
-        $methodEOM     = $client->getMeta('http_message_methodEOM');
-        $contentLength = $client->getMeta('http_message_contentLength');
-        $buffer        = $client->getMeta('http_message_buffer');
-        $packets       = $client->getMeta('http_message_packets');
-        $errorCode     = $client->getMeta('http_message_error_code');
-
-        // start of message
-        if (!$methodEOM && ($parts = self::parseMessage($data)) && isset($parts['start_line']) &&
-            isset($parts['headers']) &&
-            isset($parts['start_line'][2]) && strpos($parts['start_line'][2], 'HTTP/1') === 0
-        ) {
-            if (isset($parts['headers']['content-length'])) {
-                $contentLength = $parts['headers']['content-length'];
-                $methodEOM     = 'length';
-                $consumed      = strlen($parts['data']);
-            } else if (isset($parts['headers']['transfer-encoding']) &&
-                       preg_match('/chunked/i', $parts['headers']['transfer-encoding'])
-            ) {
-                $methodEOM = 'chunk';
-            } else {
-                $errorCode = 400;
-            }
-
-            if ($errorCode) {
-                $client->setMeta('http_message_error_code', $errorCode);
-            } else {
-                $buffer = $data;
-
-                $client->setMeta('http_message_consumed', $consumed);
-                $client->setMeta('http_message_methodEOM', $methodEOM);
-                $client->setMeta('http_message_contentLength', $contentLength);
-                $client->setMeta('http_message_buffer', $$buffer);
-            }
-        } else if ($methodEOM) {
-        } else {
-            // error with request..
-        }
-
-        //if (!($parsed = self::parseRequest($message))) {
-        //    return FALSE;
-        //}
-        //
-        //return (new ClientRequest($parsed['method'], '', $parsed['headers']))
-        //    ->setProtocolVersion($parsed['protocol_version'])
-        //    ->setScheme($parsed['request_url']['scheme'])
-        //    ->setHost($parsed['request_url']['host'])
-        //    ->setPath($parsed['request_url']['path'])
-        //    ->setPort($parsed['request_url']['port'])
-        //    ->setQuery($parsed['request_url']['query'])
-        //    ->setBody($parsed['body'])
-        //    ->setState();
-    }
-
-    /**
      * Parse an HTTP response message into an associative array of parts.
      *
      * @param string $message HTTP response to parse
@@ -162,7 +100,7 @@ class Parser
      * @param string $message Message to parse
      * @return array|bool
      */
-    private static function parseMessage($message)
+    public static function parseMessage($message)
     {
         if (!$message) {
             return FALSE;

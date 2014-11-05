@@ -18,6 +18,13 @@ Interface ConnectionInterface extends \React\Socket\ConnectionInterface
 
     /**
      * @param $key
+     * @param $value
+     * @return $this
+     */
+    public function appendMeta($key, $value);
+
+    /**
+     * @param $key
      * @return null
      */
     public function getMeta($key);

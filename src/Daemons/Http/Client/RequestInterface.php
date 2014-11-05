@@ -4,6 +4,7 @@ namespace Hathoora\Jaal\Daemons\Http\Client;
 
 use Hathoora\Jaal\Daemons\Http\Message\ResponseInterface;
 use Hathoora\Jaal\IO\React\Socket\ConnectionInterface;
+use Hathoora\Jaal\Daemons\Http\Upstream\RequestInterface as UpstreamRequestInterface;
 
 Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestInterface
 {
@@ -23,13 +24,12 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
     public function getStream();
 
     /**
-     * Reads incoming data (when more than buffer) to parse it into a message
+     * Reads incoming data from client to parse it into a message
      *
-     * @param ConnectionInterface $stream
-     * @param                     $data
+     * @param $data
      * @return void
      */
-    public function handleIncomingData(ConnectionInterface $stream, $data);
+    public function handleInboundData($data);
 
     /**
      * Set response to this request
@@ -54,4 +54,19 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
      * @return mixed
      */
     public function reply($code = '', $message = '');
+
+    /**
+     * Set the upstream request
+     *
+     * @param UpstreamRequestInterface $request
+     * @return self
+     */
+    public function setUpstreamRequest(UpstreamRequestInterface $request);
+
+    /**
+     * Get the upstream request
+     *
+     * @return UpstreamRequestInterface
+     */
+    public function getUpstreamRequest();
 }

@@ -46,16 +46,20 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
     public function getResponse();
 
     /**
-     * Send's the request to upstream server
+     * Send's the request to upstream server, this also allows sending incoming client data directly to upstream without
+     * having to write to local disk hence preventing unnecessary IO
+     *
+     * @param null $buffer
      */
-    public function send();
+    public function send($buffer = null);
 
     /**
-     * @param Stream $stream
+     * Reads the data from upstream server and parses it
+     *
      * @param        $data
      * @return mixed
      */
-    public function handleUpstreamOutputData(Stream $stream, $data);
+    public function handleInboundData($data);
 
     /**
      * Upstream reply is client's request response
