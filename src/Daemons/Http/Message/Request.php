@@ -63,6 +63,7 @@ class Request extends Message implements RequestInterface
         $this->setUrl($url);
         $this->setRequestId();
         $this->addHeaders($headers);
+        $this->prepareParseVariables();
     }
 
     /**

@@ -45,6 +45,17 @@ class InboundManager extends IOManager
             parent::add($stream);
         }
 
+        if ($this->protocol == 'http') {
+            $stream->setMeta('http_message_consumed', 0);
+            $stream->setMeta('http_message_methodEOM', '');
+            $stream->setMeta('http_message_contentLength', 0);
+            $stream->setMeta('http_message_buffer', 0);
+            $stream->setMeta('http_message_packets', 0);
+            $stream->setMeta('http_message_error_code', 0);
+
+            $this->newQueue($stream, 'requests');
+        }
+
         //if ($notAdded) {
         //
         //    /* @TODO revisit timeouts */

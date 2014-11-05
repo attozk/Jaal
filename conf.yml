@@ -3,7 +3,7 @@ jaal:
     - 192.168.1.1
     - 187.76.1.2
   debug:
-      level: -199
+      level: -190
       colors: 1
 
   resolver:  8.8.8.8
@@ -12,9 +12,9 @@ httpd:
     port: 81
     listen: 0.0.0.0
     timeout:  60
-    keepalive:
-        timeout: 25
-        max: 100
+    #keepalive:
+    #    timeout: 25
+    #    max: 100
 
 admin:
     port: 900

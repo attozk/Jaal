@@ -85,7 +85,7 @@ class Httpd extends EventEmitter implements HttpdInterface
     {
         $this->socket->on('connection', function (ConnectionInterface $client) {
 
-            $this->inboundIOManager->add($client)->newQueue($client, 'requests');
+            $this->inboundIOManager->add($client);
 
             $client->isAllowed($client)->then(
                 function ($client) {
@@ -107,22 +107,14 @@ class Httpd extends EventEmitter implements HttpdInterface
     {
         $request = NULL;
 
+        $request = Parser::getClientRequest($this->inboundIOManager, $client, $data);
+        die('a');
+
         //In order to remain persistent, all messages on a connection need to have a self-defined message length
         //(i.e., one not defined by closure of the connection), as described in Section 3.3. A server MUST read the entire
         //request message body or close the connection after sending its response, since otherwise the remaining data on a
         //persistent connection would be misinterpreted as the next request. Likewise, a client MUST read the entire
         //response message body if it intends to reuse the same connection for a subsequent request.
-
-        $request = Parser::getClientRequest($data);
-
-        $request = Parser::getClientRequest($data);
-
-        if (Parser::hasReachedEOM($this, $client, $data)) {
-
-
-            $this->inboundIOManager->add($client)->newQueue($client, 'requests');
-        }
-
 
         if (!$this->inboundIOManager->getProp($client, 'request')) {
 

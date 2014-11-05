@@ -38,6 +38,11 @@ Class Connection extends \React\Socket\Connection implements ConnectionInterface
      */
     public $resource;
 
+    /**
+     * @var array for storing other meta data (per daemon)
+     */
+    protected $meta;
+
     public function __construct($stream, LoopInterface $loop)
     {
         $this->millitime = Time::millitime();
@@ -69,5 +74,26 @@ Class Connection extends \React\Socket\Connection implements ConnectionInterface
         $deferred->resolve($this);
 
         return $promise;
+    }
+
+    /**
+     * @param $key
+     * @param $value
+     * @return $this
+     */
+    public function setMeta($key, $value)
+    {
+        $this->meta[$key] = $value;
+
+        return $this;
+    }
+
+    /**
+     * @param $key
+     * @return null
+     */
+    public function getMeta($key)
+    {
+        return (isset($this->meta[$key]) ? $this->meta[$key] : NULL);
     }
 }

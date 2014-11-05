@@ -112,7 +112,7 @@ abstract class IOManager
         $id = $stream->id;
         $key = 'queues:' . $propertyName;
 
-        if (!$this->streams[$id][$key])
+        if (!isset($this->streams[$id]) || !isset($this->streams[$id][$key]))
         {
             $this->streams[$id][$key] = new \SplQueue();
         }

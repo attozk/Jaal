@@ -189,11 +189,13 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
                               $data .
                               "\n" . '----------- /Request Read: ' . $this->id . ' -----------' . "\n");
 
-            #echo "---------------------------\n";
-            #echo preg_replace_callback( "/(\n|\r)/", function($match) {
-            #    return ($match[1] == "\n" ? '\n' . "\n" : '\r');
-            #}, $data);
-            #echo "---------------------------\n";
+            echo "---------------------------\n";
+            echo preg_replace_callback("/(\n|\r)/",
+            function ($match) {
+                return ($match[1] == "\n" ? '\n' . "\n" : '\r');
+            },
+                                       $data);
+            echo "---------------------------\n";
 
             // @TODO no need to parse entire message, just look for content-length
 
