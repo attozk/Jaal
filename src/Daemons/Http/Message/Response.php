@@ -89,7 +89,7 @@ Class Response extends Request implements ResponseInterface
      */
     public function getRawHeaders()
     {
-        $headers = 'HTTP/1.1 ' . $this->statusCode . ' ' . $this->reasonPhrase . "\r\n";
+        $headers = 'HTTP/' . $this->protocolVersion . ' ' . $this->statusCode . ' ' . $this->reasonPhrase . "\r\n";
         $lines   = $this->getHeaderLines();
 
         if (!empty($lines)) {

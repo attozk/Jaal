@@ -56,7 +56,7 @@ abstract class Message implements MessageInterface
      */
     private function normalizeHeader($header)
     {
-        return strtolower($header);
+        return ucwords($header);
     }
 
     /**

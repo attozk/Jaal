@@ -99,7 +99,7 @@ class Jaal
             $this->httpd->listen($port, $ip);
 
             $this->loop->addPeriodicTimer(
-                10,
+                20,
                 function ()
                 {
 

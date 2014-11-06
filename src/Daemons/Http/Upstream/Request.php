@@ -66,12 +66,12 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
      */
     protected function prepareHeaders()
     {
-        if ($version = $this->vhost->config->get('http_version')) {
+        if ($version = $this->vhost->config->get('httpVersion')) {
             $this->setProtocolVersion($version);
         }
 
         // setting new proxy request headers
-        $arrHeaders = $this->vhost->config->get('headers.server_to_upstream_request');
+        $arrHeaders = $this->vhost->config->get('headers.serverToProxy');
 
         foreach ($arrHeaders as $header => $value) {
             $this->addHeader($header, $value);
@@ -144,9 +144,9 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         }
 
         if ($message) {
-            Logger::getInstance()->log(-100, "\n" . '----------- Request Write: ' . $this->id . ' -----------' . "\n" .
+            Logger::getInstance()->log(-100, "\n" . '----------- Upstream Write: ' . $this->id . ' -----------' . "\n" .
                                              $message .
-                "\n" . '----------- /Request Write: ' . $this->id . ' -----------' . "\n");
+                "\n" . '----------- /Upstream Write: ' . $this->id . ' -----------' . "\n");
 
             $this->stream->write($message);
         }
@@ -305,7 +305,8 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
                 $status = $hasReachedEOM;
                 $this->setExecutionTime();
                 $this->clientRequest->setExecutionTime()
-                                    ->setState(self::STATE_EOM);
+                    ->setState(self::STATE_EOM)
+                    ->hasBeenReplied();
             }
         }
         else if ($errorCode) {
@@ -325,8 +326,8 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
      */
     public function error($code, $message = NULL)
     {
-        //        $this->cleanup();
-        //        $this->clientRequest->error($code, $message);
+        // @TODO what happens here?
+        //$this->cleanup();
     }
 
     /**
@@ -334,12 +335,6 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
      */
     public function cleanup()
     {
-        $this->clientRequest->cleanup();
         unset($this->clientRequest);
-
-        //        if (!$this->vhost->config->get('upstreams.keepalive.max') && !$this->vhost->config->get('upstreams.keepalive.max'))
-        //        {
-        //            $this->stream->end();
-        //        }
     }
 }

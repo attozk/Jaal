@@ -16,6 +16,7 @@ use Hathoora\Jaal\IO\Manager\OutboundManager;
 use Hathoora\Jaal\IO\React\Socket\ConnectionInterface;
 use Hathoora\Jaal\IO\React\Socket\Server as SocketServer;
 use Hathoora\Jaal\IO\React\SocketClient\Stream;
+use Hathoora\Jaal\Jaal;
 use Hathoora\Jaal\Logger;
 use Hathoora\Jaal\Util\Time;
 use React\EventLoop\LoopInterface;
@@ -146,10 +147,12 @@ class Httpd extends EventEmitter implements HttpdInterface
              * INT      when error code
              */
             $status = $request->handleInboundData($data);
+            $requestIsDone = FALSE;
 
             if (is_int($status) && $request->getState() == ClientRequestInterface::STATE_ERROR)
             {
                 $errorCode = $status;
+                $requestParsingIsDone = true;
             }
             // Request is ready to emit and/or EOM
             else if ($request->getParsingAttr('packets') == 1 || $request->getStateParsing() == ClientRequestInterface::STATE_PARSING_EOM)
@@ -181,8 +184,12 @@ class Httpd extends EventEmitter implements HttpdInterface
 
                 ## we reached EOM, lets be prepared to parse a new request on the same channel
                 if ($status === true) {
-                    $this->inboundIOManagerAddNewRequestProperty($client);
+                    $requestParsingIsDone = true;
                 }
+            }
+
+            if ($requestParsingIsDone) {
+                $this->handleClientInboundRequestParsingDone($request);
             }
         }
         else {
@@ -193,6 +200,45 @@ class Httpd extends EventEmitter implements HttpdInterface
         if ($errorCode) {
             //$request->error($errorCode, '', true);
         }
+    }
+
+    /**
+     * Actions to take when we client's request has been parsed
+     *
+     * @param ClientRequestInterface $request
+     */
+    public function handleClientInboundRequestParsingDone(ClientRequestInterface $request)
+    {
+        // remove old processed requests..
+        $this->inboundIOManager->removeProp($request->getStream(), 'request');
+        $this->inboundIOManagerAddNewRequestProperty($request->getStream());
+    }
+
+    /**
+     * Actions to take when we client has received all the data
+     *
+     * @param ClientRequestInterface $request
+     * @param bool $closeStream
+     */
+    public function handleClientInboundRequestDone(ClientRequestInterface $request, $closeStream = false)
+    {
+        // remove old processed requests..
+        $this->inboundIOManager->removeProp($request->getStream(), 'request');
+
+        if (
+            $closeStream ||
+            (!Jaal::getInstance()->config->get('httpd.keepalive.max') && !Jaal::getInstance()
+                    ->config->get('httpd.keepalive.max')) ||
+            $request->getProtocolVersion() == '1.0'
+        ) {
+            $request->getStream()->end();
+        } // keep connection alive
+        else {
+            $this->inboundIOManagerAddNewRequestProperty($request->getStream());
+        }
+
+        $request->cleanup();
+        unset($request);
     }
 
     /**
@@ -271,21 +317,18 @@ class Httpd extends EventEmitter implements HttpdInterface
      * @param Stream              $stream
      * @param Vhost               $vhost
      * @param ConnectionInterface $client
-     * @return bool true if more client requests are in queue..
+     * @return int number of client requests in queue
      */
     protected function outboundIOManagerAddNewRequestProperty(Stream $stream, $vhost, ConnectionInterface $client)
     {
-        $hasQueuedRequest = FALSE;
+        $numQueuedRequests = 0;
         $queue            = $this->inboundIOManager->getQueue($client, 'requests');
 
         //echo "checking for outboundIOManagerAddNewRequestProperty has " .  $queue->count() . "\n";
 
-        // remove old processed requests..
-        $this->outboundIOManager->removeProp($stream, 'request');
-
         if ($queue && $queue->count() && ($clientRequest = $queue->dequeue()))
         {
-            $hasQueuedRequest = TRUE;
+            $numQueuedRequests = $queue->count();
             $upstreamRequest  = new UpstreamRequest($this, $vhost, $clientRequest);
             $upstreamRequest->setStartTime()
                             ->setStream($stream)
@@ -299,7 +342,7 @@ class Httpd extends EventEmitter implements HttpdInterface
                 ->stats['hits']++;
         }
 
-        return $hasQueuedRequest;
+        return $numQueuedRequests;
     }
 
     /**
@@ -368,13 +411,29 @@ class Httpd extends EventEmitter implements HttpdInterface
      * Actions to take when we got the reply from upstream server
      *
      * @param UpstreamRequestInterface $request
+     * @param bool $closeStream
      */
-    public function handleUpstreamInboundRequestDone(UpstreamRequestInterface $request)
+    public function handleUpstreamInboundRequestDone(UpstreamRequestInterface $request, $closeStream = false)
     {
-        $this->outboundIOManagerAddNewRequestProperty(
+        // remove old processed requests..
+        $this->outboundIOManager->removeProp($request->getStream(), 'request');
+
+        $numQueuedRequests = $this->outboundIOManagerAddNewRequestProperty(
             $request->getStream(),
             $request->getVhost(),
             $request->getClientRequest()->getStream());
+
+        // close upstream connection?
+        if (
+            (!$numQueuedRequests &&
+                (
+                    $request->getClientRequest()->getProtocolVersion() == '1.0' ||
+                    (!$request->getVhost()->config->get('upstreams.keepalive.max') && !$request->getVhost()->config->get('upstreams.keepalive.max'))
+                )
+            ) || $closeStream
+        ) {
+            $request->getStream()->end();
+        }
 
         $request->cleanup();
         unset($request);

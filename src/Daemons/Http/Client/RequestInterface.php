@@ -32,6 +32,21 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
     public function handleInboundData($data);
 
     /**
+     * Set the upstream request
+     *
+     * @param UpstreamRequestInterface $request
+     * @return self
+     */
+    public function setUpstreamRequest(UpstreamRequestInterface $request);
+
+    /**
+     * Get the upstream request
+     *
+     * @return UpstreamRequestInterface
+     */
+    public function getUpstreamRequest();
+
+    /**
      * Set response to this request
      *
      * @param ResponseInterface $response
@@ -61,25 +76,17 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
      *
      * @param string $code
      * @param string $message   if any
-     * @param bool   $streamEnd to end the stream after reply (overwrite keep-alive settings)
+     * @param bool $closeStream to end the stream after reply (overwrite keep-alive settings)
      * @return self
      */
-    public function error($code, $message = '', $streamEnd = FALSE);
+    public function error($code, $message = '', $closeStream = FALSE);
 
     /**
-     * Set the upstream request
+     * When the message has been replied to the client, this function needs to be called
      *
-     * @param UpstreamRequestInterface $request
-     * @return self
+     * @param bool $closeStream to end the stream after reply (overwrite keep-alive settings)
      */
-    public function setUpstreamRequest(UpstreamRequestInterface $request);
-
-    /**
-     * Get the upstream request
-     *
-     * @return UpstreamRequestInterface
-     */
-    public function getUpstreamRequest();
+    public function hasBeenReplied($closeStream = FALSE);
 
     public function cleanup();
 }

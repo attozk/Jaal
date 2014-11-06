@@ -44,7 +44,7 @@ abstract class IOManager
             ];
 
             $stream->on('data', function ($data) use ($stream) {
-                $this->stats['bytes'] = strlen($data);
+                $this->stats['bytes'] += strlen($data);
                 $this->setProp($stream, 'lastActivity', Time::millitime());
             });
 

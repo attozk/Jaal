@@ -4,24 +4,53 @@ $httpd->on('request.mine.pk:81',
 function (\Hathoora\Jaal\Daemons\Http\Client\RequestInterface $request) use ($httpd) {
 
     $arrVhostConfig = [
-        // nginx inspred
-        'http_version'      => '1.1',
-        'proxy_hide_header' => [
-            'X-Powered-By',
-            'Server'
+        'httpVersion' => '1.1',    // default
+
+        'headers' => [
+            /*
+                Adds the specified field to a response header
+             */
+            'add' => [
+                'Date' => '{{now}}',                // default
+                'Server' => '{{jaal.name}}',       // default
+                'Hello' => 'World'
+            ]
         ],
-        'add_header'        => [],
-        'proxy_hide_header' => [
-            'accept-encoding'
+
+        'proxy' => [
+            'headers' => [
+                /*
+                    upstream response headers that we do not want to pass to client.
+                    this directive sets additional fields that will not be passed.
+                */
+                'hide' => [
+                    'Server',   // default
+                    'Date',     // default
+                    'X-Powered-By',
+                    'accept-encoding'
+                ],
+                /*
+                    Disables processing of certain response header fields from the proxied server. The following fields
+                    can be ignored: “Expires”, “Cache-Control”, “Set-Cookie”, and “Vary”
+                 */
+                'ignore' => [
+
+                ],
+                /*
+                    Allows redefining or appending fields to the request header passed to the proxied server. The value can
+                    contain text, variables, and their combinations.
+                */
+                'set' => [
+                    'host' => '{{request.host}}',       // default
+                ]
+            ]
         ],
-        'proxy_set_header'  => [
-            'HOST' => 'mine.pk',
-        ],
+
         'upstreams'         => [
-            /*'keepalive' => array(
+            'keepalive' => array(
                 'timeout' => 10,
                 'max' => 100
-            ),*/
+            ),
 
             'servers' => [
                 'server1' => [

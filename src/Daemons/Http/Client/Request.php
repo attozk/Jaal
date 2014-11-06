@@ -86,6 +86,11 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         if ($errorCode)
             return $errorCode;
 
+        Logger::getInstance()->log(-100, "\n" . '----------- Request Read: ' . $this->id . ' -----------' . "\n" .
+            $data .
+            "\n" . '----------- /Request Read: ' . $this->id . ' -----------' . "\n");
+
+
 //        echo "---------------------------\n";
 //        echo preg_replace_callback("/(\n|\r)/", function ($match) {
 //                return ($match[1] == "\n" ? '\n' . "\n" : '\r');
@@ -175,6 +180,29 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     }
 
     /**
+     * Set the upstream request
+     *
+     * @param UpstreamRequestInterface $request
+     * @return self
+     */
+    public function setUpstreamRequest(UpstreamRequestInterface $request)
+    {
+        $this->upstreamRequest = $request;
+
+        return $this;
+    }
+
+    /**
+     * Get the upstream request
+     *
+     * @return UpstreamRequestInterface
+     */
+    public function getUpstreamRequest()
+    {
+        return $this->upstreamRequest;
+    }
+
+    /**
      * Set response to this request
      *
      * @param ResponseInterface $response
@@ -227,6 +255,10 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         else
             $message = $buffer;
 
+        Logger::getInstance()->log(-100, "\n" . '----------- Request Replying: ' . $this->id . ' -----------' . "\n" .
+            $message .
+            "\n" . '----------- /Request Replying: ' . $this->id . ' -----------' . "\n");
+
         $this->stream->write($message);
 
         return $this;
@@ -237,14 +269,13 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
      *
      * @param string $code
      * @param string $message if any
-     * @param bool $streamEnd to end the stream after reply (overwrite keep-alive settings)
+     * @param bool $closeStream to end the stream after reply (overwrite keep-alive settings)
      * @return self
      */
-    public function error($code, $message = '', $streamEnd = FALSE)
+    public function error($code, $message = '', $closeStream = FALSE)
     {
-        $this->setState(self::STATE_DONE);
-
         $this->response = new Response($code);
+        $this->setExecutionTime();
         $this->prepareResponseHeaders();
         $this->response->setStatusCode($code);
         $this->response->setReasonPhrase($message);
@@ -257,27 +288,22 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
                   'REPLY (' . $this->state . ') ' . Logger::getInstance()->color($this->getUrl(), 'red') .
                   ' using stream: ' . Logger::getInstance()->color($this->stream->id, 'green'));
 
-        $this->cleanup($streamEnd);
+        $this->hasBeenReplied($closeStream);
 
         return $this;
     }
 
     /**
-     * Cleanups internal registry
-     * @param bool $streamEnd to end the stream after reply (overwrite keep-alive settings)
+     * When the message has been replied to the client, this function needs to be called
+     *
+     * @param bool $closeStream to end the stream after reply (overwrite keep-alive settings)
      */
-    public function cleanup($streamEnd = FALSE)
+    public function hasBeenReplied($closeStream = FALSE)
     {
-        unset($this->upstreamRequest);
-
-        //        $this->httpd->inboundIOManager->removeProp($this->stream, 'request');
-        //
-        //        if ($streamEnd || (!Jaal::getInstance()->config->get('httpd.keepalive.max') && !Jaal::getInstance()
-        //                    ->config->get('httpd.keepalive.max')) || $this->protocolVersion == '1.0')
-        //        {
-        //            $this->stream->end();
-        //        }
+        $this->setState(self::STATE_DONE);
+        $this->httpd->handleClientInboundRequestDone($this, $closeStream);
     }
+
 
     /**
      * Prepare response headers (based on config) to send to client
@@ -294,11 +320,11 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 
         if ($this->upstreamRequest)
         {
-            $arrHeaders = $this->upstreamRequest->getVhost()->config->get('headers.upstream_to_client_response');
+            $arrHeaders = $this->upstreamRequest->getVhost()->config->get('headers.toClient');
 
             foreach ($arrHeaders as $header => $value)
             {
-                if ($value === FALSE)
+                if ($value === '')
                 {
                     $this->response->removeHeader($header);
                 }
@@ -318,30 +344,14 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         } else {
             $this->response->addHeader('Connection', 'close');
         }
-
-        $this->response->addHeader('Server', Jaal::name);
     }
 
     /**
-     * Set the upstream request
-     *
-     * @param UpstreamRequestInterface $request
-     * @return self
+     * Cleanups internal registry
+     * @param bool $streamEnd to end the stream after reply (overwrite keep-alive settings)
      */
-    public function setUpstreamRequest(UpstreamRequestInterface $request)
+    public function cleanup($streamEnd = FALSE)
     {
-        $this->upstreamRequest = $request;
-
-        return $this;
-    }
-
-    /**
-     * Get the upstream request
-     *
-     * @return UpstreamRequestInterface
-     */
-    public function getUpstreamRequest()
-    {
-        return $this->upstreamRequest;
+        unset($this->upstreamRequest);
     }
 }
