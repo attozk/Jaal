@@ -43,7 +43,7 @@ class Jaal
     /**
      * Path to conf.d
      *
-*@var
+     * @var
      */
     protected $confDPath;
 
@@ -92,6 +92,7 @@ class Jaal
 
     public function initDaemons()
     {
+        Logger::getInstance()->log(100, 'Event Library: ' . get_class($this->loop));
         if ($this->config->get('httpd') && ($port = $this->config->get('httpd.port')) && ($ip = $this->config->get('httpd.listen'))) {
             Logger::getInstance()->log(100, 'HTTPD listening on ' . $ip . ':' . $port);
             $socket = new SocketServer($this->loop);

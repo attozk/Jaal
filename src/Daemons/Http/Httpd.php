@@ -125,6 +125,46 @@ class Httpd extends EventEmitter implements HttpdInterface
         $this->inboundIOManager->add($client)
                                ->setProp($client, 'request', $request)
                                ->newQueue($client, 'requests');
+
+
+//        if (!$this->inboundIOManager->getProp($client, 'timerTimeout'))
+//        {
+//            $timeout = Jaal::getInstance()->config->get('httpd.timeout');
+//
+//            $timerTimeout = $this->loop->addPeriodicTimer($timeout, function () use ($client) {
+//
+//                Logger::getInstance()->log(-99, Logger::getInstance()->color($stream->id, 'green') .
+//                    ' connection timeout from Inbound Manager, hits: ' . $stream->hits .
+//                    ', connection time: ' . Time::millitimeDiff($stream->millitime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
+//            }
+//        });
+//        $this->setProp($stream, 'timerTimeout', $timerTimeout);
+//
+//        }
+//
+//        $keepaliveTimeout = Jaal::getInstance()->config->get('httpd.keepalive.timeout');
+//
+//
+//
+//        if ($timeout && $keepaliveTimeout && ($keepaliveTimeout * 1.5) < $timeout) {
+//            $timerKeepaliveTimeout = $this->loop->addPeriodicTimer($keepaliveTimeout, function () use ($stream) {
+//                if ($request = $this->getProp($stream, 'request')) {
+//                    if (($timerKeepaliveTimeout = $this->getProp($stream, 'timerKeepaliveTimeout')) &&
+//                        $timerKeepaliveTimeout instanceof TimerInterface)
+//                    {
+//                        $this->loop->cancelTimer($timerKeepaliveTimeout);
+//                        $this->removeProp($stream, 'timerKeepaliveTimeout');
+//                    }
+//
+//                    Logger::getInstance()->log(-99, Logger::getInstance()->color($stream->id, 'green') . ' keep-alive timeout from Inbound Manager, hits: ' .
+//                        $stream->hits . ', connection time: ' . Time::millitimeDiff($stream->millitime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
+//
+//
+//                    $stream->end();
+//                }
+//            });
+//            $this->setProp($stream, 'timerKeepaliveTimeout', $timerKeepaliveTimeout);
+//        }
     }
 
     /**
