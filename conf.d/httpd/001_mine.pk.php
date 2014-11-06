@@ -5,7 +5,7 @@ function (\Hathoora\Jaal\Daemons\Http\Client\RequestInterface $request) use ($ht
 
     $arrVhostConfig = [
         // nginx inspred
-        'http_version'      => '1.0',
+        'http_version'      => '1.1',
         'proxy_hide_header' => [
             'X-Powered-By',
             'Server'
@@ -15,7 +15,7 @@ function (\Hathoora\Jaal\Daemons\Http\Client\RequestInterface $request) use ($ht
             'accept-encoding'
         ],
         'proxy_set_header'  => [
-            'HOST' => 'HOST',
+            'HOST' => 'mine.pk',
         ],
         'upstreams'         => [
             /*'keepalive' => array(
@@ -25,7 +25,7 @@ function (\Hathoora\Jaal\Daemons\Http\Client\RequestInterface $request) use ($ht
 
             'servers' => [
                 'server1' => [
-                    'ip'     => '19.168.1.44',
+                    'ip' => '192.168.1.44',
                     'port'   => 80,
                     'weight' => 5,
                 ]

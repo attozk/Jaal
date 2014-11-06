@@ -47,13 +47,24 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
     public function getResponse();
 
     /**
-     * Reply to client's request using $stream
+     * Reply to client
      *
-     * @param string $code    to overwrite response's status code
-     * @param string $message to overwrite response's body
-     * @return mixed
+     * Typically upstream's response is send to client as a series of data
+     *
+     * @param $buffer
+     * @return self
      */
-    public function reply($code = '', $message = '');
+    public function reply($buffer);
+
+    /**
+     * Respond to client as error
+     *
+     * @param string $code
+     * @param string $message   if any
+     * @param bool   $streamEnd to end the stream after reply (overwrite keep-alive settings)
+     * @return self
+     */
+    public function error($code, $message = '', $streamEnd = FALSE);
 
     /**
      * Set the upstream request
@@ -69,4 +80,6 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
      * @return UpstreamRequestInterface
      */
     public function getUpstreamRequest();
+
+    public function cleanup();
 }

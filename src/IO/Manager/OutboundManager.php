@@ -29,7 +29,7 @@ class OutboundManager extends IOManager
 
     protected $streams;
 
-    protected $ips2StreamMapping;
+    protected $upstreamPoolMapping;
 
     /**
      * @param LoopInterface $loop
@@ -41,7 +41,7 @@ class OutboundManager extends IOManager
         $this->loop    = $loop;
         $this->dns     = $dns;
         $this->protocol = $protocol;
-        $this->streams = $this->ips2StreamMapping = [];
+        $this->streams = $this->upstreamPoolMapping = [];
     }
 
     public function add($stream)
@@ -80,22 +80,30 @@ class OutboundManager extends IOManager
         return parent::remove($stream);
     }
 
-    public function addIp2StreamMapping($key, Stream $stream)
+    public function addUpstreamPoolMapping($key, Stream $stream)
     {
-        $this->ips2StreamMapping[$key] = $stream->id;
+        $this->upstreamPoolMapping[$key] = $stream->id;
     }
 
-    public function removeIp2StreamMapping($key)
+    public function getUpstreamPoolMapping($key)
     {
-        if (isset($this->ips2StreamMapping[$key])) {
-            unset($this->ips2StreamMapping[$key]);
+        if (isset($this->upstreamPoolMapping[$key]))
+        {
+            return $this->upstreamPoolMapping[$key];
         }
     }
 
-    public function buildConnector($ip, $port, $keepalive, $timeout = 10)
+    public function removeUpstreamPoolMapping($key)
+    {
+        if (isset($this->upstreamPoolMapping[$key]))
+        {
+            unset($this->upstreamPoolMapping[$key]);
+        }
+    }
+
+    public function buildConnector($ip, $port, $keepalive, $timeout = 10, $upstreamPoolKey = NULL)
     {
         $stream = NULL;
-        $key    = $ip . ':' . $port;
 
         if (!$timeout) {
             $timeout = 10;
@@ -104,14 +112,14 @@ class OutboundManager extends IOManager
         $connector = NULL;
         $deferred  = new Deferred();
         $promise   = $deferred->promise();
-        $id = $this->removeIp2StreamMapping($key);
+        $id = $this->getUpstreamPoolMapping($upstreamPoolKey);
 
-        if ($keepalive && ($stream = $this->getStreamById($id))) {
+        if ($keepalive && ($stream = $this->getStreamById($id)))
+        {
 
             $status = $this->getProp($stream, 'status');
             if ($status == 'connected') {
 
-                $stream->hits++;
                 Logger::getInstance()->log(-99,
                     $stream->getRemoteAddress() . ' <' . $id . '> keep alive, hits: ' . $stream->hits . ', idle: ' . Time::millitimeDiff($this->getProp($stream, 'lastActivity')) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
                     'lightPurple'));
@@ -119,22 +127,25 @@ class OutboundManager extends IOManager
                 $deferred->resolve($stream);
             } else {
                 $stream = null;
-                $this->removeIp2StreamMapping($key);
+                $this->removeUpstreamPoolMapping($upstreamPoolKey);
             }
         }
 
         if (!$stream) {
 
             $connector = new Connector($this->loop, $this->dns);
-            $connector->create($ip, $port)->then(function (Stream $stream) use ($deferred, $key) {
-                    $this->addIp2StreamMapping($key, $stream);
+            $connector->create($ip, $port)->then(
+                function (Stream $stream) use ($deferred, $upstreamPoolKey)
+                {
+                    $this->addUpstreamPoolMapping($upstreamPoolKey, $stream);
                     $this->setProp($stream, 'status', 'connected');
                     $deferred->resolve($stream);
                 },
-                function ($error) use ($deferred, $key) {
+                function ($error) use ($deferred, $upstreamPoolKey)
+                {
 
-                    $this->removeIp2StreamMapping($key);
-                    Logger::getInstance()->log('NOTICE', 'Unable to connect to remote server: ' . $key);
+                    $this->removeUpstreamPoolMapping($upstreamPoolKey);
+                    Logger::getInstance()->log('NOTICE', 'Unable to connect to remote server: ' . $upstreamPoolKey);
 
                     $deferred->reject();
                 });

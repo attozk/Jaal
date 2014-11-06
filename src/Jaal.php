@@ -98,17 +98,20 @@ class Jaal
             $this->httpd = new Httpd($this->loop, $socket, $this->dns);
             $this->httpd->listen($port, $ip);
 
-            //$this->loop->addPeriodicTimer(15, function () {
-            //
-            //    #echo 'Size of HTTPD: ' .  round(strlen(serialize($this->httpd) / 1024 / 1024, 2)) . " MB \n";
-            //    #echo 'Size of Inbound IO: ' .  round(strlen(serialize($this->httpd->inboundIOManager) / 1024 / 1024, 2)) . " MB \n";
-            //    #echo 'Size of Outbound IO: ' .  round(strlen(serialize($this->httpd->outboundIOManager) / 1024 / 1024, 2)) . " MB \n";
-            //    print_r($this->httpd->stats());
-            //
-            //    echo date('Y-m-d H:i:s') . '----------------------------GC----------------------------' . "\n" .
-            //         'Memory: ' . round(memory_get_usage() / 1024 / 1024, 2) . " MB\n" .
-            //         'Peak Memory: ' . round(memory_get_peak_usage() / 1024 / 1024, 2) . "MB \n" . "\n\n";
-            //});
+            $this->loop->addPeriodicTimer(
+                10,
+                function ()
+                {
+
+                    #echo 'Size of HTTPD: ' .  round(strlen(serialize($this->httpd) / 1024 / 1024, 2)) . " MB \n";
+                    #echo 'Size of Inbound IO: ' .  round(strlen(serialize($this->httpd->inboundIOManager) / 1024 / 1024, 2)) . " MB \n";
+                    #echo 'Size of Outbound IO: ' .  round(strlen(serialize($this->httpd->outboundIOManager) / 1024 / 1024, 2)) . " MB \n";
+                    print_r($this->httpd->stats());
+
+                    echo date('Y-m-d H:i:s') . '----------------------------GC----------------------------' . "\n" .
+                         'Memory: ' . round(memory_get_usage() / 1024 / 1024, 2) . " MB\n" .
+                         'Peak Memory: ' . round(memory_get_peak_usage() / 1024 / 1024, 2) . "MB \n" . "\n\n";
+                });
         }
 
         if ($this->config->get('admin') && ($port = $this->config->get('admin.port')) && ($ip = $this->config->get('admin.listen'))) {

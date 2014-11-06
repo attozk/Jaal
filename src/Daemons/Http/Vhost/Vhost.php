@@ -56,14 +56,13 @@ Class Vhost
         }
 
         // keep alive?
-        if (isset($arrConfig['upstreams']) && isset($arrConfig['upstreams']['keepalive']) &&
-            !empty($arrConfig['upstreams']['keepalive']['timeout']) &&
+        if (isset($arrConfig['upstreams']) && isset($arrConfig['upstreams']['keepalive']) && !empty
+            ($arrConfig['upstreams']['keepalive']['timeout']) &&
             isset($arrConfig['upstreams']['keepalive']['max'])
         ) {
             $arrProxySetHeaders['Connection'] = 'Keep-Alive';
-            $arrProxySetHeaders['Keep-Alive']
-                                              =
-                'timeout=' . $arrConfig['upstreams']['keepalive']['timeout'] . ', max=' .
+            $arrProxySetHeaders['Keep-Alive'] = 'timeout=' . $arrConfig['upstreams']['keepalive']['timeout'] . ',
+            max=' .
                 $arrConfig['upstreams']['keepalive']['max'];
         } else {
             $arrProxySetHeaders['Connection'] = 'Close';

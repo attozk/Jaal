@@ -9,6 +9,13 @@ use Hathoora\Jaal\IO\React\SocketClient\Stream;
 Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestInterface
 {
     /**
+     * Return vhost
+     *
+     * @return \Hathoora\Jaal\Daemons\Http\Vhost\Vhost
+     */
+    public function getVhost();
+
+    /**
      * Return  client's request
      *
      * @return ClientRequestInterface
@@ -29,21 +36,6 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
      * @return Stream
      */
     public function getStream();
-
-    /**
-     * Set upstream response
-     *
-     * @param ResponseInterface $response
-     * @return self
-     */
-    public function setResponse(ResponseInterface $response);
-
-    /**
-     * Get upstream response
-     *
-     * @return ResponseInterface
-     */
-    public function getResponse();
 
     /**
      * Send's the request to upstream server, this also allows sending incoming client data directly to upstream without
@@ -67,5 +59,7 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
      * @param null $code to overwrite upstream response
      * @param null $message
      */
-    public function reply($code = NULL, $message = NULL);
+    public function error($code, $message = NULL);
+
+    public function cleanup();
 }

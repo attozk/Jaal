@@ -2,6 +2,7 @@
 
 namespace Hathoora\Jaal\Daemons\Http\Client;
 
+use Hathoora\Jaal\Daemons\Http\Httpd;
 use Hathoora\Jaal\Daemons\Http\Message\Parser;
 use Hathoora\Jaal\IO\Manager\InboundManager;
 use Hathoora\Jaal\Jaal;
@@ -13,6 +14,11 @@ use Hathoora\Jaal\Daemons\Http\Upstream\RequestInterface as UpstreamRequestInter
 
 Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements RequestInterface
 {
+    /**
+     * @type Httpd
+     */
+    protected $httpd;
+
     /**
      * @var ResponseInterface
      */
@@ -28,8 +34,9 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
      */
     protected $stream;
 
-    public function __construct($method = null, $url = null, $headers = [])
+    public function __construct(Httpd $httpd, $method = NULL, $url = NULL, $headers = [])
     {
+        $this->httpd = $httpd;
         parent::__construct($method, $url, $headers);
     }
 
@@ -86,6 +93,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 //            $data);
 //        echo "---------------------------\n";
 
+
         if ($this->stateParsing != self::STATE_PARSING_PROCESSING) {
             $this->stateParsing = self::STATE_PARSING_PROCESSING;
         }
@@ -128,13 +136,11 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         // we already have detected methodEOM, now body is the same as $data (i.e. it doesn't include headers)
         else {
             $body = $data;
+            $buffer .= $data;
 
-            // if upstream attached, then send write away
             if ($this->upstreamRequest) {
-                $this->upstreamRequest->send($data);
-            } // keep buffering
-            else {
-                $buffer .= $data;
+                $this->upstreamRequest->send($buffer);
+                $buffer = ''; // reset buffer
             }
         }
 
@@ -192,55 +198,85 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     }
 
     /**
-     * Reply to client's request using $stream
+     * Reply to client
      *
-     * @param string $code to overwrite response's status code
-     * @param string $message to overwrite response's body
-     * @param bool $streamEnd to end the stream after reply (overwrite keep-alive settings)
-     * @return mixed
+     * Typically upstream's response is send to client as a series of data
+     *
+     * @param $buffer
+     * @return self
      */
-    public function reply($code = '', $message = '', $streamEnd = false)
+    public function reply($buffer)
+    {
+        $message = NULL;
+
+        if ($this->headersSent == FALSE)
+        {
+            $this->prepareResponseHeaders();
+            $message           = $this->response->getRawHeaders() . "\r\n" . $buffer;
+            $this->headersSent = TRUE;
+            $this->state       = self::STATE_SENDING;
+
+            Logger::getInstance()
+                  ->log(
+                      -99,
+                      'REPLYING (' . $this->state . ') ' . Logger::getInstance()->color(
+                          $this->getUrl(),
+                          'red') .
+                      ' using stream: ' . Logger::getInstance()->color($this->stream->id, 'green'));
+        }
+        else
+            $message = $buffer;
+
+        $this->stream->write($message);
+
+        return $this;
+    }
+
+    /**
+     * Respond to client as error
+     *
+     * @param string $code
+     * @param string $message if any
+     * @param bool $streamEnd to end the stream after reply (overwrite keep-alive settings)
+     * @return self
+     */
+    public function error($code, $message = '', $streamEnd = FALSE)
     {
         $this->setState(self::STATE_DONE);
-        $responseCreated = FALSE;
 
-        if (!$this->response) {
-            $this->response = new Response($code);
-            $this->response->setReasonPhrase($message);
-            $responseCreated = TRUE;
-        }
-
+        $this->response = new Response($code);
         $this->prepareResponseHeaders();
-
-        if ($code && $responseCreated === FALSE) {
-            $this->response->setStatusCode($code);
-            $this->response->setReasonPhrase($message);
-        }
+        $this->response->setStatusCode($code);
+        $this->response->setReasonPhrase($message);
 
         $this->stream->write($this->response->getRawHeaders() . "\r\n" . $this->response->getBody());
+
+        Logger::getInstance()
+              ->log(
+                  -99,
+                  'REPLY (' . $this->state . ') ' . Logger::getInstance()->color($this->getUrl(), 'red') .
+                  ' using stream: ' . Logger::getInstance()->color($this->stream->id, 'green'));
+
         $this->cleanup($streamEnd);
+
+        return $this;
     }
 
     /**
      * Cleanups internal registry
      * @param bool $streamEnd to end the stream after reply (overwrite keep-alive settings)
      */
-    private function cleanup($streamEnd = false)
+    public function cleanup($streamEnd = FALSE)
     {
-        Logger::getInstance()
-              ->log(-99,
-                    'REPLY (' . $this->state . ') ' . Logger::getInstance()->color($this->getUrl(), 'red') .
-                    ' using stream: ' . Logger::getInstance()->color($this->stream->id, 'green'));
+        unset($this->upstreamRequest);
 
-        Jaal::getInstance()->getDaemon('httpd')->inboundIOManager->removeProp($this->stream, 'request');
-
-        if ($streamEnd ||
-            (!Jaal::getInstance()->config->get('httpd.keepalive.max') && !Jaal::getInstance()->config->get('httpd.keepalive.max')))
-        {
-            $this->stream->end();
-        }
-
-        //unset($this);
+        //        $this->httpd->inboundIOManager->removeProp($this->stream, 'request');
+        //
+        //        if ($streamEnd || (!Jaal::getInstance()->config->get('httpd.keepalive.max') && !Jaal::getInstance()
+        //                    ->config->get('httpd.keepalive.max')) || $this->protocolVersion == '1.0')
+        //        {
+        //            $this->stream->end();
+        //        }
     }
 
     /**
@@ -251,11 +287,32 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         $keepAliveTimeout = Jaal::getInstance()->config->get('httpd.keepalive.timeout');
         $keepAliveMax     = Jaal::getInstance()->config->get('httpd.keepalive.max');
 
-        #if ($this->response->getProtocolVersion() != $this->getProtocolVersion()) {
-        #    $this->response->setProtocolVersion($this->getProtocolVersion());
-        #}
+        if ($this->response->getProtocolVersion() != $this->protocolVersion)
+        {
+            $this->response->setProtocolVersion($this->protocolVersion);
+        }
 
-        if ($this->getHeader('connection') != 'close' && $keepAliveTimeout && $keepAliveMax) {
+        if ($this->upstreamRequest)
+        {
+            $arrHeaders = $this->upstreamRequest->getVhost()->config->get('headers.upstream_to_client_response');
+
+            foreach ($arrHeaders as $header => $value)
+            {
+                if ($value === FALSE)
+                {
+                    $this->response->removeHeader($header);
+                }
+                else
+                {
+                    $this->response->addHeader($header, $value);
+                }
+            }
+        }
+
+        if ($this->protocolVersion == '1.1' && $this->getHeader('connection') != 'close' && $keepAliveTimeout &&
+            $keepAliveMax
+        )
+        {
             $this->response->addHeader('Connection', 'keep-alive');
             $this->response->addHeader('Keep-Alive', 'timeout=' . $keepAliveTimeout . ', max=' . $keepAliveMax);
         } else {

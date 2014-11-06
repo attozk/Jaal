@@ -74,6 +74,13 @@ class Request extends Message implements RequestInterface
     ];
 
     /**
+     * This is true when headers has been sent to client/upstream
+     *
+     * @var bool
+     */
+    protected $headersSent = FALSE;
+
+    /**
      * @param       $method
      * @param       $url
      * @param array $headers

@@ -132,10 +132,8 @@ abstract class IOManager
         $id = $stream->id;
         $key = 'queues:' . $propertyName;
 
-        if (!$this->streams[$id][$key])
-        {
+        if (isset($this->streams[$id]) && isset($this->streams[$id][$key]))
             $value = $this->streams[$id][$key];
-        }
 
         return $value;
     }
@@ -215,4 +213,58 @@ abstract class IOManager
     {
         return $this->stats;
     }
+
+    //    /**
+    //     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
+    //     * @param $propertyName
+    //     * @return SplQueue
+    //     */
+    //    public function newQueue($stream, $propertyName)
+    //    {
+    //        $ip = $stream->getRemoteAddress();
+    //        $key = $ip . ':' . $propertyName;
+    //
+    //        if (!isset($this->connectionQueue[$key]))
+    //        {
+    //            echo "NEW QUEUE CREATED \n";
+    //            $this->connectionQueue[$key] = new \SplQueue();
+    //        }
+    //
+    //        /** \SplQueue() */
+    //        return $this->connectionQueue[$key];
+    //    }
+    //
+    //    /**
+    //     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
+    //     * @param $propertyName
+    //     * @return null|\SplQueue
+    //     */
+    //    public function getQueue($stream, $propertyName)
+    //    {
+    //        $value = NULL;
+    //        $ip = $stream->getRemoteAddress();
+    //        $key = $ip . ':' . $propertyName;
+    //
+    //        if (isset($this->connectionQueue[$key]))
+    //            $value = $this->connectionQueue[$key];
+    //
+    //        return $value;
+    //    }
+    //
+    //    /**
+    //     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
+    //     * @param $propertyName
+    //     * @return self
+    //     */
+    //    public function removeQueue($stream, $propertyName)
+    //    {
+    //        $value = NULL;
+    //        $ip = $stream->getRemoteAddress();
+    //        $key = $ip . ':' . $propertyName;
+    //
+    //        if (isset($this->connectionQueue[$key]))
+    //            unset($this->connectionQueue[$key]);
+    //
+    //        return $this;
+    //    }
 }
