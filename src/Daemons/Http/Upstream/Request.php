@@ -255,35 +255,29 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 
         if (!$errorCode) {
 
-            $this->clientRequest->reply($body);
-
             if ($methodEOM == 'chunked')
             {
-                /*
-                for ($res = ''; !empty($str); $str = trim($str)) {
-                    $pos = strpos($str, "\r\n");
-                    $len = hexdec(substr($str, 0, $pos));
-                    $res.= substr($str, $pos + 2, $len);
-                    $str = substr($str, $pos + 2 + $len);
-                }
-                return $res;
+                /* http://httpwg.github.io/specs/rfc7230.html#header.transfer-encoding
+                 chunked-body   = *chunk
+                                   last-chunk
+                                   trailer-part
+                                   CRLF
 
-                if ($chunk_length === false) {
-                    $data = trim(fgets($fp, 128));
-                    $chunk_length = hexdec($data);
-                } else if ($chunk_length > 0) {
-                    $read_length = $chunk_length > $readBlockSize ? $readBlockSize : $chunk_length;
-                    $chunk_length -= $read_length;
-                    $data = fread($fp, $read_length);
-                    fwrite($wfp, $data);
-                    if ($chunk_length <= 0) {
-                        fseek($fp, 2, SEEK_CUR);
-                        $chunk_length = false;
-                    }
-                } else {
-                     break;
+                  chunk          = chunk-size [ chunk-ext ] CRLF
+                                   chunk-data CRLF
+                  chunk-size     = 1*HEXDIG
+                  last-chunk     = 1*("0") [ chunk-ext ] CRLF
+
+                  chunk-data     = 1*OCTET ; a sequence of chunk-size octets
+                 */
+
+                $chunkSizeHex = strstr($body, "\r\n", true);
+                $chunkSize = hexdec($chunkSizeHex);
+
+                // @TODO implement trailer field..
+                if ($chunkSize == 0) {
+                    $hasReachedEOM = true;
                 }
-                */
             }
             else if ($methodEOM == 'length')
             {
@@ -297,6 +291,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
                 }
             }
 
+            $this->clientRequest->reply($body);
             //echo "CONSUMED $consumed out of $contentLength \n";
 
             if ($hasReachedEOM) {

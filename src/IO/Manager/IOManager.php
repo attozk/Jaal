@@ -6,7 +6,7 @@ use Hathoora\Jaal\Util\Time;
 
 abstract class IOManager
 {
-    protected $streams = '';
+    protected $streams = array();
 
     public $stats
         = [
@@ -107,7 +107,7 @@ abstract class IOManager
      * @param $propertyName
      * @return SplQueue
      */
-    public function newQueue($stream, $propertyName)
+    public function addQueue($stream, $propertyName)
     {
         $id = $stream->id;
         $key = 'queues:' . $propertyName;

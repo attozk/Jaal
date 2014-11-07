@@ -123,8 +123,7 @@ class Httpd extends EventEmitter implements HttpdInterface
                 ->setStream($client);
 
         $this->inboundIOManager->add($client)
-                               ->setProp($client, 'request', $request)
-                               ->newQueue($client, 'requests');
+            ->setProp($client, 'request', $request);
 
 
 //        if (!$this->inboundIOManager->getProp($client, 'timerTimeout'))
@@ -187,7 +186,7 @@ class Httpd extends EventEmitter implements HttpdInterface
              * INT      when error code
              */
             $status = $request->handleInboundData($data);
-            $requestIsDone = FALSE;
+            $requestParsingIsDone = FALSE;
 
             if (is_int($status) && $request->getState() == ClientRequestInterface::STATE_ERROR)
             {
@@ -204,8 +203,10 @@ class Httpd extends EventEmitter implements HttpdInterface
                     $client->hits++;
                     $client->resource = $request->getUrl();
                     $this->inboundIOManager->stats['hits']++;
-                    $this->inboundIOManager->getQueue($client, 'requests')
-                                           ->enqueue($request);
+
+                    // I think we need to add requests to UPSTREAM's QUEUE instead..
+//                    $this->inboundIOManager->getQueue($client, 'requests')
+//                                           ->enqueue($request);
 
                     Logger::getInstance()->log(
                         -50,
@@ -238,7 +239,7 @@ class Httpd extends EventEmitter implements HttpdInterface
 
         // we need to close this connection manually even when keep-alive
         if ($errorCode) {
-            //$request->error($errorCode, '', true);
+            $request->error($errorCode, '', true);
         }
     }
 
@@ -262,8 +263,11 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     public function handleClientInboundRequestDone(ClientRequestInterface $request, $closeStream = false)
     {
-        // remove old processed requests..
-        $this->inboundIOManager->removeProp($request->getStream(), 'request');
+        // if we already have a request that errored out before reaching parsing end, then lets remove it
+        if (($currentInboundUnParsedRequest = $this->inboundIOManager->getProp($request->getStream(), 'request')) && $currentInboundUnParsedRequest->id == $request->id) {
+            $this->handleClientInboundRequestParsingDone($request);
+        }
+
 
         if (
             $closeStream ||
@@ -273,12 +277,8 @@ class Httpd extends EventEmitter implements HttpdInterface
         ) {
             $request->getStream()->end();
         } // keep connection alive
-        else {
-            $this->inboundIOManagerAddNewRequestProperty($request->getStream());
-        }
 
         $request->cleanup();
-        unset($request);
     }
 
     /**
@@ -320,69 +320,57 @@ class Httpd extends EventEmitter implements HttpdInterface
             Logger::getInstance()->color('[' . __METHOD__ . ']', 'yellow'));
 
         if (is_array($vhostConfig)) {
-            $vhost = VhostFactory::create($vhostConfig, $clientRequest->getScheme(), $clientRequest->getHost(), $clientRequest->getPort());
+            $vhost = VhostFactory::create($this, $vhostConfig, $clientRequest->getScheme(), $clientRequest->getHost(), $clientRequest->getPort());
         }
         else if ($vhostConfig instanceof Vhost) {
             $vhost = $vhostConfig;
         }
 
-        $arrUpstreamConfig = $vhost->getUpstreamConnectorConfig();
+        $newConnectorCB = function ($stream) use ($vhost, $clientRequest) {
+            $upstreamRequest = $this->outboundIOManagerAddNewRequestProperty($stream, $vhost, $clientRequest);
+            $upstreamRequest->send();
 
-        $ip        = $arrUpstreamConfig['ip'];
-        $port      = $arrUpstreamConfig['port'];
-        $keepalive = $arrUpstreamConfig['keepalive'];
-        $timeout   = $arrUpstreamConfig['timeout'];
-        $keepAliveHash = $ip . ':' . $clientRequest->getStream()->getRemoteAddress();
+            $stream->on('data', function ($data) use ($stream) {
+                $this->handleUpstreamInboundRequestData($stream, $data);
+            });
+        };
 
-        $this->outboundIOManager->buildConnector($ip, $port, $keepalive, $timeout, $keepAliveHash)->then(
-            function (Stream $stream) use ($vhost, $clientRequest) {
+        $reuseConnectorCB = function ($stream) use ($vhost, $clientRequest) {
+            $this->outboundIOManagerAddNewRequestProperty($stream, $vhost, $clientRequest);
+        };
 
-                $this->outboundIOManagerAddNewRequestProperty($stream, $vhost, $clientRequest->getStream());
+        $errorConnectorCB = function ($error) use ($clientRequest) {
+            $clientRequest->error(500, '', TRUE);
+        };
 
-                $stream->on('data', function ($data) use ($stream) {
-                    $this->handleUpstreamInboundRequestData($stream, $data);
-                });
-            },
-            function ($error) use ($clientRequest) {
-
-                // we need to close this connection manually even when keep-alive
-                $clientRequest->error(500, '', TRUE);
-            }
-        );
+        $vhost->connectToUpstreamServer($clientRequest, $newConnectorCB, $reuseConnectorCB, $errorConnectorCB);
     }
 
     /**
      * Helper method for adding a new request property and setup various elements
      *
-     * @param Stream              $stream
-     * @param Vhost               $vhost
-     * @param ConnectionInterface $client
-     * @return int number of client requests in queue
+     * @param Stream $stream
+     * @param Vhost $vhost
+     * @param ClientRequestInterface $clientRequest
+     * @return UpstreamRequestInterface
      */
-    protected function outboundIOManagerAddNewRequestProperty(Stream $stream, $vhost, ConnectionInterface $client)
+    protected function outboundIOManagerAddNewRequestProperty(Stream $stream, $vhost, ClientRequestInterface $clientRequest)
     {
-        $numQueuedRequests = 0;
-        $queue            = $this->inboundIOManager->getQueue($client, 'requests');
+        $upstreamRequest = new UpstreamRequest($this, $vhost, $clientRequest);
+        $upstreamRequest->setStartTime()
+            ->setStream($stream)
+            ->setState(UpstreamRequestInterface::STATE_CONNECTED)
+            ->setStateParsing(ClientRequestInterface::STATE_PARSING_PENDING);
 
-        //echo "checking for outboundIOManagerAddNewRequestProperty has " .  $queue->count() . "\n";
+        $stream->hits++;
+        $stream->resource = $upstreamRequest->getUrl();
+        $this->outboundIOManager->add($stream)
+            ->setProp($stream, 'request', $upstreamRequest)
+            ->stats['hits']++;
 
-        if ($queue && $queue->count() && ($clientRequest = $queue->dequeue()))
-        {
-            $numQueuedRequests = $queue->count();
-            $upstreamRequest  = new UpstreamRequest($this, $vhost, $clientRequest);
-            $upstreamRequest->setStartTime()
-                            ->setStream($stream)
-                            ->setState(UpstreamRequestInterface::STATE_CONNECTED)
-                            ->setStateParsing(ClientRequestInterface::STATE_PARSING_PENDING)
-                            ->send();
+        $vhost->getQueueRequests()->enqueue($upstreamRequest);
 
-            $stream->hits++;
-            $this->outboundIOManager->add($stream)
-                                    ->setProp($stream, 'request', $upstreamRequest)
-                ->stats['hits']++;
-        }
-
-        return $numQueuedRequests;
+        return $upstreamRequest;
     }
 
     /**
@@ -457,14 +445,18 @@ class Httpd extends EventEmitter implements HttpdInterface
     {
         // remove old processed requests..
         $this->outboundIOManager->removeProp($request->getStream(), 'request');
+        $request->getStream()->resource = '';
 
-        $numQueuedRequests = $this->outboundIOManagerAddNewRequestProperty(
-            $request->getStream(),
-            $request->getVhost(),
-            $request->getClientRequest()->getStream());
+        $queue = $request->getVhost()->getQueueRequests();
+        $numQueuedRequests = $queue->count();
+
+        if ($numQueuedRequests && ($queuedRequest = $queue->dequeue())) {
+            /** @var UpstreamRequestInterface */
+            $queuedRequest->send();
+        }
 
         // close upstream connection?
-        if (
+        else if (
             (!$numQueuedRequests &&
                 (
                     $request->getClientRequest()->getProtocolVersion() == '1.0' ||
@@ -476,7 +468,6 @@ class Httpd extends EventEmitter implements HttpdInterface
         }
 
         $request->cleanup();
-        unset($request);
     }
 
     /**

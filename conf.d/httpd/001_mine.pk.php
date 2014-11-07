@@ -42,6 +42,7 @@ function (\Hathoora\Jaal\Daemons\Http\Client\RequestInterface $request) use ($ht
                 */
                 'set' => [
                     'host' => '{{request.host}}',       // default
+                    'host' => 'mine.pk',
                 ]
             ]
         ],

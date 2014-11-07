@@ -3,6 +3,12 @@
 namespace Hathoora\Jaal\Daemons\Http\Vhost;
 
 use Dflydev\DotAccessConfiguration\Configuration;
+use Hathoora\Jaal\Daemons\Http\Client\RequestInterface as ClientRequestInterface;
+use Hathoora\Jaal\Daemons\Http\Httpd;
+use Hathoora\Jaal\IO\React\SocketClient\Stream;
+use Hathoora\Jaal\Logger;
+use Hathoora\Jaal\Daemons\Http\Upstream\RequestInterface as UpstreamRequestInterface;
+use Hathoora\Jaal\Util\Time;
 
 Class Vhost
 {
@@ -12,11 +18,41 @@ Class Vhost
     public $config;
 
     /**
+     * @var Httpd
+     */
+    protected $httpd;
+
+    /**
+     * @var \SplQueue
+     */
+    protected $serverPool;
+
+    /**
      * @param $arrConfig
      */
-    public function __construct($arrConfig)
+    public function __construct(Httpd $httpd, $arrConfig)
     {
+        $this->httpd = $httpd;
         $this->init($arrConfig);
+        $this->serverPool = [
+            'requests' => new \SplQueue(),      // stores UpstreamRequest
+            'pools' => array(/*
+                 $ip:port => array(
+                    'streamIds' => array(
+                        $stream->id  = array()
+                        ...
+                    )
+                 ),
+                 $ip:port => array(
+                    'streamIds' => array(
+                        $stream->id  = array()
+                        ...
+                    )
+                 ),
+                 ....
+                 */
+            )
+        ];
     }
 
     /**
@@ -93,9 +129,10 @@ Class Vhost
     /**
      * Return upstream configs that can be used to create a connector
      *
+     * @param ClientRequestInterface $clientRequest
      * @return array
      */
-    public function getUpstreamConnectorConfig()
+    public function getNextServerConfig(ClientRequestInterface $clientRequest)
     {
         $arrServer = $this->getAvailableUpstreamServer();
         $ip        = $arrServer['ip'];
@@ -108,12 +145,144 @@ Class Vhost
         }
 
         $timeout = $this->config->get('upstreams.timeout');
+        $poolKey = $ip . ':' . $port;
 
         return [
             'ip'        => $ip,
             'port'      => $port,
             'keepalive' => $keepalive ? $keepalive : '',
-            'timeout'   => $timeout ? $timeout : ''
+            'timeout' => $timeout ? $timeout : 10,
+            'poolKey' => $poolKey
         ];
+    }
+
+    /**
+     * Add a stream to server pool
+     *
+     * @param $key
+     * @param Stream $stream
+     *
+     * @return $this
+     */
+    public function addServerStream($key, Stream $stream)
+    {
+        $id = $stream->id;
+
+        if (!isset($this->serverPool['pools'][$key])) {
+            $this->serverPool['pools'][$key] = array(
+                'streamIds' => array(
+                    $id => array('id' => $id)
+                )
+            );
+        } else if (!isset($this->serverPools['pools'][$key]['streamIds'][$id])) {
+            $this->serverPools['pools'][$key]['streamIds'][$id] = array('id' => $id);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Removes a stream from pool
+     *
+     * @param $key
+     * @param Stream $stream
+     * @return $this
+     */
+    public function removeServerStream($key, Stream $stream = null)
+    {
+        if (isset($this->serverPool[$key])) {
+            if ($stream) {
+                $id = $stream->id;
+
+                if (isset($this->serverPool['pools'][$key]['streamIds'][$id])) {
+                    unset($this->serverPool['pools'][$key]['streamIds'][$id]);
+                }
+            } else
+                unset($this->serverPool['pools'][$key]);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Gets a stream from pool
+     *
+     * @param $key
+     * @param Stream $stream
+     * @return null|array
+     */
+    public function getServerStream($key, Stream $stream = null)
+    {
+        $value = null;
+
+        if (!empty($this->serverPool['pools'][$key])) {
+
+            if ($stream) {
+                $id = $stream->id;
+
+                if (isset($this->serverPool['pools'][$key]['streamIds'][$id])) {
+                    $value = $this->serverPool['pools'][$key]['streamIds'][$id];
+                }
+            } else {
+                $rnd = array_rand($this->serverPool['pools'][$key]['streamIds']);
+                $value = $this->serverPool['pools'][$key]['streamIds'][$rnd];
+            }
+        }
+
+        return $value;
+    }
+
+    /**
+     * Add a stream to server pool
+     *
+     * @return \SplQueue
+     */
+    public function getQueueRequests()
+    {
+        return $this->serverPool['requests'];
+    }
+
+    /**
+     * @param ClientRequestInterface $clientRequest
+     * @param callable $newConnectorCB function($stram)() to be executed when new connector
+     * @param callable $reuseConnectorCB function($error)() to be executed when error
+     * @param callable $errorConnectorCB
+     */
+    public function connectToUpstreamServer(ClientRequestInterface $clientRequest, callable $newConnectorCB, callable $reuseConnectorCB, callable $errorConnectorCB)
+    {
+        $arrUpstreamConfig = $this->getNextServerConfig($clientRequest);
+        $ip = $arrUpstreamConfig['ip'];
+        $port = $arrUpstreamConfig['port'];
+        $keepalive = $arrUpstreamConfig['keepalive'];
+        $timeout = $arrUpstreamConfig['timeout'];
+        $poolKey = $arrUpstreamConfig['poolKey'];
+
+        $stream = null;
+
+        if ($keepalive && ($streamInfo = $this->getServerStream($poolKey)) && ($stream = $this->httpd->outboundIOManager->getStreamById($streamInfo['id']))) {
+            Logger::getInstance()->log(-99,
+                $stream->getRemoteAddress() . ' <' . $stream->id . '> keep alive, hits: ' . $stream->hits . ', idle: ' . Time::millitimeDiff($this->httpd->outboundIOManager->getProp($stream, 'lastActivity')) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']',
+                    'lightPurple'));
+            $reuseConnectorCB($stream);
+        }
+
+        if ($stream == null) {
+            $this->httpd->outboundIOManager->buildConnector($ip, $port)->then(
+                function (Stream $stream) use ($newConnectorCB, $poolKey) {
+
+                    echo "ADD SERVER addServerStream for $poolKey ===> " . $stream->id . "\n";
+                    $this->addServerStream($poolKey, $stream);
+
+                    $stream->on('close', function ($stream) use ($poolKey) {
+                        $this->removeServerStream($poolKey, $stream);
+                    });
+
+                    $newConnectorCB($stream);
+                },
+                function ($error) use ($errorConnectorCB) {
+                    $errorConnectorCB($error);
+                }
+            );
+        }
     }
 }
