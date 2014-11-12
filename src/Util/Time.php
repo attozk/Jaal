@@ -10,6 +10,7 @@ class Time
      */
     public static function millitime()
     {
+        return round(microtime(true) * 1000);
         $microtime = microtime();
         $comps = explode(' ', $microtime);
 

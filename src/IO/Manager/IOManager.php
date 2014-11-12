@@ -6,34 +6,33 @@ use Hathoora\Jaal\Util\Time;
 
 abstract class IOManager
 {
-    protected $streams = array();
+    protected $streams = [];
 
-    public $stats
-        = [
-            'streams'     => 0, // number of connections
-            'hits'        => 0,    // number of requests
-            'bytes'       => 0,
-            'concurrency' => [/*
+    public $stats = [
+        'streams'     => 0, // number of connections
+        'hits'        => 0,    // number of requests
+        'bytes'       => 0,
+        'concurrency' => [/*
              $id => array(
                 'ip' => $ip,
                 'resource' => $resource
              )
              */
-            ]
-        ];
+        ]
+    ];
 
     /**
      * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
+     *
      * @return $this
      */
     public function add($stream)
     {
         $id = $stream->id;
-        if (!isset($this->streams[$id])) {
-
+        if (!isset($this->streams[$id]))
+        {
             $this->streams[$id] = [
-                'stream' => $stream,
-                'lastActivity' => Time::millitime()
+                'stream' => $stream
             ];
 
             $this->stats['streams']++;
@@ -43,12 +42,13 @@ abstract class IOManager
                 'hits'     => &$stream->hits
             ];
 
-            $stream->on('data', function ($data) use ($stream) {
+            $stream->on('data', function ($data) use ($stream)
+            {
                 $this->stats['bytes'] += strlen($data);
-                $this->setProp($stream, 'lastActivity', Time::millitime());
             });
 
-            $stream->on('close', function ($stream) {
+            $stream->on('close', function ($stream)
+            {
                 unset($this->stats['concurrency'][$stream->id]);
                 $this->remove($stream);
             });
@@ -59,14 +59,16 @@ abstract class IOManager
 
     /**
      * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
+     *
      * @return null|array
      */
     public function get($stream)
     {
-        $value = NULL;
+        $value = null;
         $id    = $stream->id;
 
-        if (isset($this->streams[$id])) {
+        if (isset($this->streams[$id]))
+        {
             $value = $this->streams[$id];
         }
 
@@ -75,13 +77,15 @@ abstract class IOManager
 
     /**
      * @param $id
+     *
      * @return null|\Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\SocketClient\Stream
      */
     public function getStreamById($id)
     {
-        $value = NULL;
+        $value = null;
 
-        if (isset($this->streams[$id])) {
+        if (isset($this->streams[$id]))
+        {
             $value = $this->streams[$id]['stream'];
         }
 
@@ -90,12 +94,14 @@ abstract class IOManager
 
     /**
      * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
+     *
      * @return $this
      */
     public function remove($stream)
     {
         $id = $stream->id;
-        if (isset($this->streams[$id])) {
+        if (isset($this->streams[$id]))
+        {
             unset($this->streams[$id]);
         }
 
@@ -104,7 +110,8 @@ abstract class IOManager
 
     /**
      * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
-     * @param $propertyName
+     * @param                                                                                                                                          $propertyName
+     *
      * @return SplQueue
      */
     public function addQueue($stream, $propertyName)
@@ -118,19 +125,21 @@ abstract class IOManager
         }
 
         /** \SplQueue() */
+
         return $this->streams[$id][$key];
     }
 
     /**
      * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
-     * @param $propertyName
+     * @param                                                                                                                                          $propertyName
+     *
      * @return null|\SplQueue
      */
     public function getQueue($stream, $propertyName)
     {
-        $value = NULL;
-        $id = $stream->id;
-        $key = 'queues:' . $propertyName;
+        $value = null;
+        $id    = $stream->id;
+        $key   = 'queues:' . $propertyName;
 
         if (isset($this->streams[$id]) && isset($this->streams[$id][$key]))
             $value = $this->streams[$id][$key];
@@ -142,8 +151,9 @@ abstract class IOManager
      * Sets property for a stream that manager needs to keep track of
      *
      * @param        $stream
-     * @param $property
-     * @param $value
+     * @param        $property
+     * @param        $value
+     *
      * @return self
      */
     public function setProp($stream, $property, $value)
@@ -160,13 +170,15 @@ abstract class IOManager
      *
      * @param $stream
      * @param $property
+     *
      * @return null|mixed
      */
     public function getProp($stream, $property)
     {
-        $value = NULL;
+        $value = null;
 
-        if (($arr = $this->get($stream)) && isset($arr[$property])) {
+        if (($arr = $this->get($stream)) && isset($arr[$property]))
+        {
             $value = $arr[$property];
         }
 
@@ -179,22 +191,25 @@ abstract class IOManager
      * @param        $stream
      * @param        $property
      * @param string $data
+     *
      * @return self
      */
     public function appendProp($stream, $property, $data)
     {
-        $value = NULL;
+        $value = null;
         $arr   = $this->get($stream);
 
-        if (isset($arr[$property])) {
+        if (isset($arr[$property]))
+        {
             $value .= $data;
-        } else {
+        }
+        else
+        {
             $value = $data;
         }
 
         return $this;
     }
-
 
     /**
      * Remove property of a stream
@@ -204,7 +219,8 @@ abstract class IOManager
      */
     public function removeProp($stream, $property)
     {
-        if (isset($this->streams[$stream->id]) && isset($this->streams[$stream->id][$property])) {
+        if (isset($this->streams[$stream->id]) && isset($this->streams[$stream->id][$property]))
+        {
             unset($this->streams[$stream->id][$property]);
         }
     }
@@ -213,58 +229,4 @@ abstract class IOManager
     {
         return $this->stats;
     }
-
-    //    /**
-    //     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
-    //     * @param $propertyName
-    //     * @return SplQueue
-    //     */
-    //    public function newQueue($stream, $propertyName)
-    //    {
-    //        $ip = $stream->getRemoteAddress();
-    //        $key = $ip . ':' . $propertyName;
-    //
-    //        if (!isset($this->connectionQueue[$key]))
-    //        {
-    //            echo "NEW QUEUE CREATED \n";
-    //            $this->connectionQueue[$key] = new \SplQueue();
-    //        }
-    //
-    //        /** \SplQueue() */
-    //        return $this->connectionQueue[$key];
-    //    }
-    //
-    //    /**
-    //     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
-    //     * @param $propertyName
-    //     * @return null|\SplQueue
-    //     */
-    //    public function getQueue($stream, $propertyName)
-    //    {
-    //        $value = NULL;
-    //        $ip = $stream->getRemoteAddress();
-    //        $key = $ip . ':' . $propertyName;
-    //
-    //        if (isset($this->connectionQueue[$key]))
-    //            $value = $this->connectionQueue[$key];
-    //
-    //        return $value;
-    //    }
-    //
-    //    /**
-    //     * @param \Hathoora\Jaal\IO\React\Socket\Connection|\Hathoora\Jaal\IO\React\Socket\ConnectionInterface|\Hathoora\Jaal\IO\React\SocketClient\Stream $stream
-    //     * @param $propertyName
-    //     * @return self
-    //     */
-    //    public function removeQueue($stream, $propertyName)
-    //    {
-    //        $value = NULL;
-    //        $ip = $stream->getRemoteAddress();
-    //        $key = $ip . ':' . $propertyName;
-    //
-    //        if (isset($this->connectionQueue[$key]))
-    //            unset($this->connectionQueue[$key]);
-    //
-    //        return $this;
-    //    }
 }

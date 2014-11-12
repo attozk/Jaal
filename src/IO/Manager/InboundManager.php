@@ -32,16 +32,11 @@ class InboundManager extends IOManager
 
     public function add($stream)
     {
-        $notAdded = FALSE;
-        if (!isset($this->streams[$stream->id])) {
-            $notAdded = TRUE;
-            Logger::getInstance()->log(-99, Logger::getInstance()->color($stream->id,
-                                                                         'green') . ' / ' . $stream->remoteId .
-                                            ' has been added to Inbound Manager, hits: ' .
-                                            $stream->hits . ', connection time: ' .
-                                            Time::millitimeDiff($stream->millitime) . ' ms ' .
-                                            Logger::getInstance()->color('[' . __METHOD__ . ']',
-                                                                         'lightCyan'));
+        if (!isset($this->streams[$stream->id]))
+        {
+            Logger::getInstance()->log(-99, sprintf('%-25s' . $stream->id . "\n" .
+                                                    "\t" . '[local: ' . $stream->id . ',  remote: ' . $stream->remoteId . ', connect-time: ' . Time::millitimeDiff($stream->millitime) . 'ms, ' .
+                                                    'hits: ' . $stream->hits . ', resource: ' . $stream->resource . ']', 'InboundIOManager-New'));
             parent::add($stream);
         }
 
@@ -52,14 +47,13 @@ class InboundManager extends IOManager
     {
 
         $id = $stream->id;
-        if (isset($this->streams[$id])) {
-            Logger::getInstance()->log(-99, Logger::getInstance()->color($stream->id,
-                                                                         'green') . ' / ' . $stream->remoteId .
-                                            ' has been removed from Inbound Manager, hits: ' .
-                                            $stream->hits . ', connection time: ' .
-                                            Time::millitimeDiff($stream->millitime) . ' ms ' .
-                                            Logger::getInstance()->color('[' . __METHOD__ . ']',
-                                                                         'lightCyan'));
+        if (isset($this->streams[$id]))
+        {
+            Logger::getInstance()->log(-99, sprintf('%-25s' . $stream->id . "\n" .
+                                                    "\t" . '[local: ' . $stream->id . ',  remote: ' . $stream->remoteId . ', connect-time: ' . Time::millitimeDiff($stream->millitime) . 'ms, ' .
+                                                    'idle-time: ' . Time::millitimeDiff($stream->lastActivity) . 'ms, ' .
+                                                    'hits: ' . $stream->hits . ', resource: ' . $stream->resource . ']', 'InboundIOManager-Remove'));
+
         }
 
         return parent::remove($stream);

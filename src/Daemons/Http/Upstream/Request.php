@@ -2,6 +2,7 @@
 
 namespace Hathoora\Jaal\Daemons\Http\Upstream;
 
+use Evenement\EventEmitterTrait;
 use Hathoora\Jaal\Daemons\Http\Httpd;
 use Hathoora\Jaal\Daemons\Http\Message\Response;
 use Hathoora\Jaal\Jaal;
@@ -12,12 +13,19 @@ use Hathoora\Jaal\Daemons\Http\Message\ResponseInterface;
 use Hathoora\Jaal\Daemons\Http\Vhost\Vhost;
 use Hathoora\Jaal\IO\React\SocketClient\Stream;
 
+/**
+ * Class Request for requesting upstream server and returning the response back to client as the response
+ *
+ * @emit    request.headers [$this] when request headers are ready
+ * @emit    inbound.error [$this, $code] when there is an error parsing response
+ * @emit    inbound.buffering [$this, $buffer] when request is being read including up to eom
+ * @emit    inbound.eom [$this] messaged parsed and no more incoming data from client
+ *
+ * @package Hathoora\Jaal\Daemons\Http\Upstream
+ */
 Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements RequestInterface
 {
-    /**
-     * @type Httpd
-     */
-    protected $httpd;
+    use EventEmitterTrait;
 
     /**
      * @var Vhost
@@ -35,13 +43,11 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     protected $stream;
 
     /**
-     * @param Httpd $httpd
      * @param Vhost                  $vhost
      * @param ClientRequestInterface $clientRequest
      */
-    public function __construct(Httpd $httpd, Vhost $vhost, ClientRequestInterface $clientRequest)
+    public function __construct(Vhost $vhost, ClientRequestInterface $clientRequest)
     {
-        $this->httpd = $httpd;
         parent::__construct($clientRequest->getMethod(), $clientRequest->getUrl(), $clientRequest->getHeaders());
         $this->setBody($clientRequest->getBody());
         $this->vhost         = $vhost;
@@ -62,33 +68,29 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     }
 
     /**
-     * Prepares headers for the request which would be sent to upstream (from Jaal server)
+     * Prepares headers for the request which would be sent to upstream
+     *
+     * @emit request.headers [$this] when request headers are ready
      */
     protected function prepareHeaders()
     {
-        if ($version = $this->vhost->config->get('httpVersion')) {
-            $this->setProtocolVersion($version);
-        }
+        $this->setProtocolVersion($this->vhost->config->get('httpVersion'));
 
         // setting new proxy request headers
         $arrHeaders = $this->vhost->config->get('headers.serverToProxy');
-
-        foreach ($arrHeaders as $header => $value) {
+        foreach ($arrHeaders as $header => $value)
             $this->addHeader($header, $value);
-        }
 
         // copy headers from original (client) request to request we will make to upstream
         $arrClientHeaders = $this->clientRequest->getHeaders();
-        foreach ($arrClientHeaders as $header => $value) {
+        foreach ($arrClientHeaders as $header => $value)
+        {
             $header = strtolower($header);
-
-            if (isset(Headers::$arrAllowedUpstreamHeaders[$header]) && !$this->hasHeader($header)) {
+            if (isset(Headers::$arrAllowedUpstreamHeaders[$header]) && !$this->hasHeader($header))
                 $this->addHeader($header, $value);
-            }
         }
 
-        // @TODO added for testing only..
-        $this->removeHeader('accept-encoding');
+        $this->emit('request.headers', [$this]);
     }
 
     /**
@@ -105,6 +107,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
      * Set outbound stream
      *
      * @param Stream $stream
+     *
      * @return self
      */
     public function setStream(Stream $stream)
@@ -126,13 +129,14 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 
     /**
      * Send's the request to upstream server
+     *
      * @param null $buffer
      */
     public function send($buffer = null)
     {
         $message = null;
 
-        if ($this->headersSent === FALSE)
+        if ($this->headersSent === false)
         {
             $message = $this->getRawHeaders() . "\r\n\r\n" . $this->clientRequest->getBody();
             $this->headersSent = true;
@@ -143,10 +147,11 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
             $message = $buffer;
         }
 
-        if ($message) {
+        if ($message)
+        {
             Logger::getInstance()->log(-100, "\n" . '----------- Upstream Write: ' . $this->id . ' -----------' . "\n" .
                                              $message .
-                "\n" . '----------- /Upstream Write: ' . $this->id . ' -----------' . "\n");
+                                             "\n" . '----------- /Upstream Write: ' . $this->id . ' -----------' . "\n");
 
             $this->stream->write($message);
         }
@@ -160,17 +165,24 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     }
 
     /**
-     * Reads incoming data from upstream to make sense
+     * Reads incoming data to parse it into a response
      *
      * @param $data
-     * @return null|bool|int
-     *      NULL    being processed
-     *      TRUE    when message has reached EOM
-     *      INT     when error code
+     *
+     * @emit inbound.error [$this, $code] when there is an error parsing response
+     * @emit inbound.buffering [$this, $buffer] when request is being read including up to eom
+     * @emit inbound.eom [$this] messaged parsed and no more incoming data from client
      */
-    public function handleInboundData($data)
+    public function onInboundData($data)
     {
-        $hasReachedEOM = $status = null;
+        /**
+         * Status value
+         * NULL    being processed
+         * TRUE    when message has reached EOM
+         * INT     when error code
+         */
+        $status        = null;
+        $hasReachedEOM = null;
         $consumed      =& $this->parsingAttrs['consumed'];
         $methodEOM     =& $this->parsingAttrs['methodEOM'];
         $contentLength =& $this->parsingAttrs['contentLength'];
@@ -178,139 +190,123 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         $errorCode     =& $this->parsingAttrs['errorCode'];
         $packets++;
 
-        if ($errorCode)
-            return $errorCode;
+        if (!$errorCode)
+        {
+            Logger::getInstance()->log(-100, '----------- Upstream Read: ' . $this->id . ' -----------' . "\n" .
+                                             $data . "\n" .
+                                             '----------- /Upstream Read: ' . $this->id . ' -----------' . "\n");
 
-        Logger::getInstance()
-              ->log(
-                  -100,
-                  "\n" . '----------- Upstream Read: ' . $this->id . ' -----------' . "\n" .
-                  $data .
-                  "\n" . '----------- /Upstream Read: ' . $this->id . ' -----------' . "\n");
+            //        echo "---------------------------\n";
+            //        echo preg_replace_callback("/(\n|\r)/", function ($match) {
+            //                return ($match[1] == "\n" ? '\n' . "\n" : '\r');
+            //            },
+            //            $data);
+            //        echo "---------------------------\n";
 
-//        echo "---------------------------\n";
-//        echo preg_replace_callback("/(\n|\r)/", function ($match) {
-//                return ($match[1] == "\n" ? '\n' . "\n" : '\r');
-//            },
-//            $data);
-//        echo "---------------------------\n";
+            if ($this->stateParsing != self::STATE_PARSING_PROCESSING)
+                $this->stateParsing = self::STATE_PARSING_PROCESSING;
 
-        if ($this->stateParsing != self::STATE_PARSING_PROCESSING) {
-            $this->stateParsing = self::STATE_PARSING_PROCESSING;
-        }
-
-        // start of message
-        if (!$methodEOM) {
-            if (($parsed = Parser::parseResponse($data)) && isset($parsed['code']) && isset($parsed['headers']))
+            if (!$methodEOM)
             {
-                // don't include headers when calculating size of message
-                $body = $parsed['body'];
-
-                if (isset($parsed['headers']['content-length'])) {
-                    $contentLength    = $parsed['headers']['content-length'];
-                    $methodEOM = 'length';
-                }
-                else if (isset($parsed['headers']['transfer-encoding']) && preg_match('/chunked/i', $parsed['headers']['transfer-encoding'])) {
-                    $methodEOM = 'chunked';
-                }
-                // http://stackoverflow.com/a/11375745/394870
-                else if ($this->protocolVersion == '1.0')
+                if (($parsed = Parser::parseResponse($data)) && isset($parsed['code']) && isset($parsed['headers']))
                 {
-                    $methodEOM = '1.0';
+                    $body = $parsed['body'];
 
-                    $this->stream->on(
-                        'close',
-                        function ($stream)
-                        {
+                    if (isset($parsed['headers']['content-length']))
+                    {
+                        $contentLength = $parsed['headers']['content-length'];
+                        $methodEOM     = 'length';
+                    }
+                    else if (isset($parsed['headers']['transfer-encoding']) && preg_match('/chunked/i', $parsed['headers']['transfer-encoding']))
+                        $methodEOM = 'chunked';
+                    // http://stackoverflow.com/a/11375745/394870
+                    // 2014/11/8 commenting out as I need to figure out how it can be handled using EventEmitter
+                    //else if ($this->protocolVersion == '1.0')
+                    //{
+                    //    $methodEOM = '1.0';
+                    //
+                    //    $this->stream->on('close', function ($stream)
+                    //    {
+                    //        $this->stateParsing = self::STATE_PARSING_EOM;
+                    //        $this->state        = self::STATE_EOM;
+                    //        $this->setExecutionTime();
+                    //        $this->clientRequest->setExecutionTime()
+                    //                            ->setState(self::STATE_EOM);
+                    //        //$this->httpd->handleUpstreamInboundRequestDone($this);
+                    //    });
+                    //}
+                    else
+                        $errorCode = 400;
 
-                            $this->stateParsing = self::STATE_PARSING_EOM;
-                            $this->state        = self::STATE_EOM;
-                            $this->setExecutionTime();
-                            $this->clientRequest->setExecutionTime()
-                                                ->setState(self::STATE_EOM);
-
-                            $this->httpd->handleUpstreamInboundRequestDone($this);
-                        });
+                    $response = new Response($parsed['code'], $parsed['headers']);
+                    $response->setProtocolVersion($parsed['protocol'])
+                             ->setReasonPhrase($parsed['reason_phrase']);
+                    $this->clientRequest->setResponse($response);
                 }
                 else
+                    $errorCode = 402;
+            }
+            // we already have detected methodEOM, now body is the same as $data (i.e. it doesn't include headers)
+            else
+                $body = $data;
+
+            if (!$errorCode)
+            {
+                if ($methodEOM == 'chunked')
                 {
-                    $errorCode = 400;
+                    /* http://httpwg.github.io/specs/rfc7230.html#header.transfer-encoding
+                     chunked-body   = *chunk
+                                       last-chunk
+                                       trailer-part
+                                       CRLF
+
+                      chunk          = chunk-size [ chunk-ext ] CRLF
+                                       chunk-data CRLF
+                      chunk-size     = 1*HEXDIG
+                      last-chunk     = 1*("0") [ chunk-ext ] CRLF
+
+                      chunk-data     = 1*OCTET ; a sequence of chunk-size octets
+                     */
+                    $chunkSizeHex = strstr($body, "\r\n", true);
+                    $chunkSize    = hexdec($chunkSizeHex);
+
+                    // @TODO implement trailer field..
+                    if ($chunkSize == 0)
+                        $hasReachedEOM = true;
+                }
+                else if ($methodEOM == 'length')
+                {
+                    $consumed += strlen($body);
+                    if ($consumed > $consumed)
+                        $errorCode = 405;
+                    else if ($consumed == $contentLength)
+                        $hasReachedEOM = true;
                 }
 
-                $response = new Response($parsed['code'], $parsed['headers']);
-                $response->setProtocolVersion($parsed['protocol']);
-                $response->setReasonPhrase($parsed['reason_phrase']);
-
-                $this->clientRequest->setResponse($response);
+                if ($hasReachedEOM)
+                {
+                    $this->stateParsing = self::STATE_PARSING_EOM;
+                    $this->state        = self::STATE_EOM;
+                    $status             = $hasReachedEOM;
+                    $this->setExecutionTime();
+                }
             }
-            // we are unable to parse this request, its bad..
-            else {
-                $errorCode = 402;
-            }
-        }
-        // we already have detected methodEOM, now body is the same as $data (i.e. it doesn't include headers)
-        else {
-            $body = $data;
-        }
-
-        if (!$errorCode) {
-
-            if ($methodEOM == 'chunked')
+            else if ($errorCode)
             {
-                /* http://httpwg.github.io/specs/rfc7230.html#header.transfer-encoding
-                 chunked-body   = *chunk
-                                   last-chunk
-                                   trailer-part
-                                   CRLF
-
-                  chunk          = chunk-size [ chunk-ext ] CRLF
-                                   chunk-data CRLF
-                  chunk-size     = 1*HEXDIG
-                  last-chunk     = 1*("0") [ chunk-ext ] CRLF
-
-                  chunk-data     = 1*OCTET ; a sequence of chunk-size octets
-                 */
-
-                $chunkSizeHex = strstr($body, "\r\n", true);
-                $chunkSize = hexdec($chunkSizeHex);
-
-                // @TODO implement trailer field..
-                if ($chunkSize == 0) {
-                    $hasReachedEOM = true;
-                }
+                $this->stateParsing = self::STATE_PARSING_ERROR;
+                $this->state        = self::STATE_ERROR;
+                $status             = $errorCode;
             }
-            else if ($methodEOM == 'length')
+
+            if (is_int($status))
+                $this->emit('inbound.error', [$this, $errorCode]);
+            else
             {
-                $consumed += strlen($body);
-
-                if ($consumed > $consumed) {
-                    $errorCode = 405;
-                }
-                else if ($consumed == $contentLength) {
-                    $hasReachedEOM = true;
-                }
-            }
-
-            $this->clientRequest->reply($body);
-            //echo "CONSUMED $consumed out of $contentLength \n";
-
-            if ($hasReachedEOM) {
-                $this->stateParsing = self::STATE_PARSING_EOM;
-                $this->state = self::STATE_EOM;
-                $status = $hasReachedEOM;
-                $this->setExecutionTime();
-                $this->clientRequest->setExecutionTime()
-                    ->setState(self::STATE_EOM)
-                    ->hasBeenReplied();
+                $this->emit('inbound.buffering', [$this, $body]);
+                if ($status === true)
+                    $this->emit('inbound.eom', [$this]);
             }
         }
-        else if ($errorCode) {
-            $this->stateParsing = self::STATE_PARSING_ERROR;
-            $this->state = self::STATE_ERROR;
-            $status = $errorCode;
-        }
-
-        return $status;
     }
 
     /**
@@ -319,10 +315,11 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
      * @param int $code
      * @param null $message
      */
-    public function error($code, $message = NULL)
+    public function error($code, $message = null)
     {
         // @TODO what happens here?
         //$this->cleanup();
+        die('Now what?');
     }
 
     /**
@@ -330,6 +327,8 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
      */
     public function cleanup()
     {
-        unset($this->clientRequest);
+        unset($this->clientRequest); // TOOD: not sure if we need this, profiler later
+        $this->removeAllListeners();
+        unset($this);
     }
 }

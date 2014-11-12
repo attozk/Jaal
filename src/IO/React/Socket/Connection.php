@@ -2,110 +2,42 @@
 
 namespace Hathoora\Jaal\IO\React\Socket;
 
-use Hathoora\Jaal\Util\Time;
+use Hathoora\Jaal\IO\React\Stream\Stream;
 use React\EventLoop\LoopInterface;
-use React\Promise\Deferred;
 
-Class Connection extends \React\Socket\Connection implements ConnectionInterface
+Class Connection extends Stream implements ConnectionInterface
 {
-    /**
-     * @var string unique identifier
-     */
-    public $id;
-
-    /**
-     * @var string unique remote identifier
-     */
-    public $remoteId;
-
-    /**
-     * @var int millitime at connect
-     */
-    public $millitime;
-
-    /**
-     * @var string remote address
-     */
-    public $remoteAddress;
-
-    /**
-     * @var int activity
-     */
-    public $hits;
-
-    /**
-     * @var string a resource e.g. for HTTP it is the URL
-     */
-    public $resource;
-
-    /**
-     * @var array for storing other meta data (per daemon)
-     */
-    protected $meta;
-
     public function __construct($stream, LoopInterface $loop)
     {
-        $this->millitime = Time::millitime();
         parent::__construct($stream, $loop);
-        $this->id       = stream_socket_get_name($this->stream, TRUE);
-        $this->remoteId = stream_socket_get_name($this->stream, FALSE);
-        $this->hits     = 0;
+        $this->id       = stream_socket_get_name($stream, true);
+        $this->remoteId = stream_socket_get_name($stream, false);
     }
 
-    public function getRemoteAddress()
+    public function handleData($stream)
     {
-        if (empty($this->remoteAddress)) {
-            $this->remoteAddress = parent::getRemoteAddress();
+        // Socket is raw, not using fread as it's interceptable by filters
+        // See issues #192, #209, and #240
+        $data = stream_socket_recvfrom($stream, $this->bufferSize);
+        if ('' !== $data && false !== $data)
+        {
+            $this->emit('data', [$data, $this]);
         }
 
-        return $this->remoteAddress;
+        if ('' === $data || false === $data || !is_resource($stream) || feof($stream))
+        {
+            $this->end();
+        }
     }
 
-    /**
-     * @internal param ConnectionInterface $client
-     * @return \React\Promise\Promise
-     */
-    public function isAllowed()
+    public function handleClose()
     {
-        // @TODO check for max & blacklisted IPs here..
-        $deferred = new Deferred();
-        $promise  = $deferred->promise();
-
-        $deferred->resolve($this);
-
-        return $promise;
-    }
-
-    /**
-     * @param $key
-     * @param $value
-     * @return $this
-     */
-    public function setMeta($key, $value)
-    {
-        $this->meta[$key] = $value;
-
-        return $this;
-    }
-
-    /**
-     * @param $key
-     * @param $value
-     * @return $this
-     */
-    public function appendMeta($key, $value)
-    {
-        $this->meta[$key] .= $value;
-
-        return $this;
-    }
-
-    /**
-     * @param $key
-     * @return null
-     */
-    public function getMeta($key)
-    {
-        return (isset($this->meta[$key]) ? $this->meta[$key] : NULL);
+        if (is_resource($this->stream))
+        {
+            // http://chat.stackoverflow.com/transcript/message/7727858#7727858
+            stream_socket_shutdown($this->stream, STREAM_SHUT_RDWR);
+            stream_set_blocking($this->stream, false);
+            fclose($this->stream);
+        }
     }
 }

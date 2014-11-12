@@ -1,6 +1,8 @@
 #!/usr/bin/env php
 <?php
 
+memprof_enable();
+
 require __DIR__ . '/../vendor/autoload.php';
 
 $doc = <<<DOC

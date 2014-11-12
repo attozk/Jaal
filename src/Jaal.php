@@ -78,7 +78,7 @@ class Jaal
         $this->initConfig();
 
         $dnsResolverFactory = new DnsFactory();
-        $this->dns = $dnsResolverFactory->createCached($this->config->get('jaal.resolver'), $loop);
+        $this->dns          = $dnsResolverFactory->createCached($this->config->get('jaal.resolver'), $loop);
 
         $this->initDaemons();
         $this->initConfD();
@@ -93,29 +93,37 @@ class Jaal
     public function initDaemons()
     {
         Logger::getInstance()->log(100, 'Event Library: ' . get_class($this->loop));
-        if ($this->config->get('httpd') && ($port = $this->config->get('httpd.port')) && ($ip = $this->config->get('httpd.listen'))) {
+        if ($this->config->get('httpd') && ($port = $this->config->get('httpd.port')) && ($ip = $this->config->get('httpd.listen')))
+        {
             Logger::getInstance()->log(100, 'HTTPD listening on ' . $ip . ':' . $port);
-            $socket = new SocketServer($this->loop);
-            $this->httpd = new Httpd($this->loop, $socket, $this->dns);
+            $socket      = new SocketServer($this->loop);
+            $this->httpd = new Httpd($this, $this->loop, $socket, Logger::getInstance());
             $this->httpd->listen($port, $ip);
 
-            $this->loop->addPeriodicTimer(
-                20,
-                function ()
-                {
+            $this->loop->addPeriodicTimer(20, function ()
+            {
 
-                    #echo 'Size of HTTPD: ' .  round(strlen(serialize($this->httpd) / 1024 / 1024, 2)) . " MB \n";
-                    #echo 'Size of Inbound IO: ' .  round(strlen(serialize($this->httpd->inboundIOManager) / 1024 / 1024, 2)) . " MB \n";
-                    #echo 'Size of Outbound IO: ' .  round(strlen(serialize($this->httpd->outboundIOManager) / 1024 / 1024, 2)) . " MB \n";
-                    print_r($this->httpd->stats());
+                #echo 'Size of HTTPD: ' .  round(strlen(serialize($this->httpd) / 1024 / 1024, 2)) . " MB \n";
+                #echo 'Size of Inbound IO: ' .  round(strlen(serialize($this->httpd->inboundIOManager) / 1024 / 1024, 2)) . " MB \n";
+                #echo 'Size of Outbound IO: ' .  round(strlen(serialize($this->httpd->outboundIOManager) / 1024 / 1024, 2)) . " MB \n";
+                print_r($this->httpd->stats());
 
-                    echo date('Y-m-d H:i:s') . '----------------------------GC----------------------------' . "\n" .
-                         'Memory: ' . round(memory_get_usage() / 1024 / 1024, 2) . " MB\n" .
-                         'Peak Memory: ' . round(memory_get_peak_usage() / 1024 / 1024, 2) . "MB \n" . "\n\n";
-                });
+                echo date('Y-m-d H:i:s') . '----------------------------GC----------------------------' . "\n" .
+                     'Memory: ' . round(memory_get_usage() / 1024 / 1024, 2) . " MB\n" .
+                     'Peak Memory: ' . round(memory_get_peak_usage() / 1024 / 1024, 2) . "MB \n" . "\n\n";
+
+                echo "-------------> " . count($this->httpd->listeners) . " LISTENERS \n";
+
+                //if (round(memory_get_usage() / 1024 / 1024, 2) > 30)
+                //{
+                //    memprof_dump_callgrind(fopen("//media/sf_www/hathoora/Jaal/callgrind.out", "w"));
+                //    die;
+                //}
+            });
         }
 
-        if ($this->config->get('admin') && ($port = $this->config->get('admin.port')) && ($ip = $this->config->get('admin.listen'))) {
+        if ($this->config->get('admin') && ($port = $this->config->get('admin.port')) && ($ip = $this->config->get('admin.listen')))
+        {
 
             $this->admin = new WAMP($this->loop);
             Logger::getInstance()->log(100, 'Admin WAMP Server listening on ' . $ip . ':' . $port);
@@ -147,7 +155,8 @@ class Jaal
         $regex       = new \RegexIterator($recIterator, '/^.+\.php$/i');
 
         $httpd = $this->getDaemon('httpd');
-        foreach ($regex as $item) {
+        foreach ($regex as $item)
+        {
 
             $filePath = $item->getPathname();
             Logger::getInstance()->debug('Config file loaded: ' . $filePath);
@@ -158,13 +167,15 @@ class Jaal
 
     /**
      * @param $name
+     *
      * @return null|Httpd
      */
     public function getDaemon($name)
     {
-        $service = NULL;
+        $service = null;
 
-        if (isset($this->$name) && is_object($this->$name)) {
+        if (isset($this->$name) && is_object($this->$name))
+        {
             $service = $this->$name;
         }
 
@@ -173,7 +184,8 @@ class Jaal
 
     public static function getInstance()
     {
-        if (!isset(static::$instance)) {
+        if (!isset(static::$instance))
+        {
             static::$instance = new self;
         }
 
