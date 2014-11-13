@@ -58,6 +58,11 @@ class Jaal
     /** @var  \Hathoora\Jaal\Daemons\Admin\WAMP */
     protected $admin;
 
+    /**
+     * @var
+     */
+    public $db;
+
     private function __construct()
     {
     }
@@ -93,6 +98,16 @@ class Jaal
     public function initDaemons()
     {
         Logger::getInstance()->log(100, 'Event Library: ' . get_class($this->loop));
+
+        if ($this->config->get('jaal.mysql') &&
+            ($user = $this->config->get('jaal.mysql.user')) &&
+            ($password = $this->config->get('jaal.mysql.password')) &&
+            ($host = $this->config->get('jaal.mysql.host')) &&
+            ($schema = $this->config->get('jaal.mysql.schema'))) {
+
+            Logger::getInstance()->log(100, 'Connecting to mysql...');
+        }
+
         if ($this->config->get('httpd') && ($port = $this->config->get('httpd.port')) && ($ip = $this->config->get('httpd.listen'))) {
             Logger::getInstance()->log(100, 'HTTPD listening on ' . $ip . ':' . $port);
             $socket = new SocketServer($this->loop);

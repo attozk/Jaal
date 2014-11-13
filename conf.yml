@@ -7,6 +7,11 @@ jaal:
       colors: 1
 
   resolver:  8.8.8.8
+  mysql:
+    user: user
+    password: password
+    schema: jaal
+    host:   127.0.0.1
 
 httpd:
     port: 81

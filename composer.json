@@ -16,8 +16,8 @@
         "react/socket": "0.4.*",
         "react/socket-client": "0.4.*",
         "react/promise": "~2.0",
+        "react/mysql": "dev-master",
         "cboden/ratchet": "0.4.*@dev",
-        "attozk/evenement-plus": "dev-master",
         "symfony/yaml": "2.5.5",
         "dflydev/dot-access-configuration": "1.0.0",
         "psr/log": "dev-master",
@@ -30,5 +30,11 @@
         "psr-4": {
             "Hathoora\\Jaal\\": "src"
         }
-    }
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/attozk/reactphp-mysql"
+        }
+    ]
 }

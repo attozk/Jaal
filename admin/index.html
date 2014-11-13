@@ -4,18 +4,34 @@
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Jaal</title>
-    <link rel="stylesheet" href="resources/assets/foundation/css/foundation.css"/>
-    <link rel="stylesheet" href="resources/assets/css/main.css"/>
-    <script src="resources/assets/foundation/js/vendor/modernizr.js"></script>
 
+    <script src="resources/assets/foundation/js/vendor/modernizr.js"></script>
+    <script src="resources/assets/foundation/js/vendor/jquery.js"></script>
+    <script src="resources/assets/foundation/js/vendor/fastclick.js"></script>
+    <script src="resources/assets/foundation/js/foundation.min.js"></script>
     <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.2.17/angular.min.js"></script>
     <script src="http://mine.pk/_assets/_app/mine.pk::minePkBase/common/v1/js/lib/autobahn.min.js?v20141016.c"></script>
     <script src="resources/assets/js/main.js"></script>
+
+    <link rel="stylesheet" href="resources/assets/foundation/css/foundation.css"/>
+    <link rel="stylesheet" href="resources/assets/css/main.css"/>
 </head>
 <body>
 
-    <header>
+    <div class="row">
 
+        <div data-alert class="alert-box" id="myAlert"> This is a standard alert. <a href="#" class="close">&times;</a> </div>
+    </div>
+    <header>
+        <!-- Postfix action -->
+        <div class="row collapse">
+            <div class="ten mobile-three columns">
+                <input type="text" />
+            </div>
+            <div class="two mobile-one columns">
+                <a class="button expand postfix">Search</a>
+            </div>
+        </div>
     </header>
     <nav>
         <ul>
@@ -33,7 +49,9 @@
         Article
     </article>
     <footer>
-
+        <script>
+            $(document).foundation();
+        </script>
     </footer>
 </body>
 </html>

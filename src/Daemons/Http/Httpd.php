@@ -3,6 +3,7 @@
 namespace Hathoora\Jaal\Daemons\Http;
 
 use Evenement\EventEmitter;
+use Hathoora\Jaal\Daemons\DaemonInterface;
 use Hathoora\Jaal\Daemons\Http\Message\Parser;
 use Hathoora\Jaal\Daemons\Http\Client\RequestInterface as ClientRequestInterface;
 use Hathoora\Jaal\Daemons\Http\Client\Request as ClientRequest;
@@ -24,7 +25,7 @@ use React\EventLoop\LoopInterface;
 use React\Dns\Resolver\Resolver;
 
 /** @event connection */
-class Httpd extends EventEmitter implements HttpdInterface
+class Httpd extends EventEmitter implements HttpdInterface, DaemonInterface
 {
     /**
      * @var \Hathoora\Jaal\Jaal
@@ -94,7 +95,35 @@ class Httpd extends EventEmitter implements HttpdInterface
         });
     }
 
+    public function config()
+    {
+        $sql = 'SELECT
+                v.vname,
+                v.port,
+                v.config,
+                va.domain,
+                va.regex,
+                d.domain_id,
+                u.uname as upstream_name,
+                us.server_id,
+                us.ip as server_ip,
+                us.port as server_port
+            FROM vhost v
+            INNER JOIN vhost_alias va ON (v.vhost_id = va.vhost_id)
+            INNER JOIN domain d ON (va.domain = d.domain)
+            INNER JOIN vhost_upstream vu ON (v.vhost_id = vu.vhost_id)
+            INNER JOIN upstream u ON (vu.upstream_id = u.upstream_id)
+            INNER JOIN upstream_server us ON (u.upstream_id = us.upstream_id)
+            WHERE
+                v.status = 1 AND
+                us.status = 1
+            ORDER BY v.weight ASC';
+    }
 
+    public function reload()
+    {
+
+    }
 
 
 
@@ -295,6 +324,12 @@ class Httpd extends EventEmitter implements HttpdInterface
         $emitEvent = 'request.' . $request->getHost() . ':' . $request->getPort();
         $this->emit($emitEvent, [$request], $fallbackCallback);
     }
+
+
+
+
+
+
 
 
 
