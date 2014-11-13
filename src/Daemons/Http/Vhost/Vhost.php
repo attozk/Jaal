@@ -326,7 +326,7 @@ Class Vhost
                 },
                 function ($error) use ($deferred)
                 {
-                    $deferred->resolve($error);
+                    $deferred->reject($error);
                 }
             );
         }

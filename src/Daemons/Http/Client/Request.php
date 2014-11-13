@@ -269,15 +269,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         $this->prepareResponseHeaders();
         $this->response->setStatusCode($code);
         $this->response->setReasonPhrase($message);
-
         $this->stream->write($this->response->getRawHeaders() . "\r\n" . $this->response->getBody());
-
-        Logger::getInstance()
-              ->log(
-                  -99,
-                  'REPLY (' . $this->state . ') ' . Logger::getInstance()->color($this->getUrl(), 'red') .
-                  ' using stream: ' . Logger::getInstance()->color($this->stream->id, 'green'));
-
         $this->hasBeenReplied($closeStream);
 
         return $this;

@@ -121,6 +121,7 @@ class Httpd extends EventEmitter implements HttpdInterface
 
     /**
      * Helper method for adding a new request property and setup various elements
+     *
      * @param ConnectionInterface $client
      */
     protected function clientRequestFactory(ConnectionInterface $client)
@@ -144,7 +145,8 @@ class Httpd extends EventEmitter implements HttpdInterface
     protected function onClientRequestData(ConnectionInterface $client, $data)
     {
         /** @var $request ClientRequest */
-        if ($request = $this->inboundIOManager->getProp($client, 'request')) {
+        if ($request = $this->inboundIOManager->getProp($client, 'request'))
+        {
 
             /**
              * $status values:
@@ -161,7 +163,8 @@ class Httpd extends EventEmitter implements HttpdInterface
             else if ($request->getParsingAttr('packets') == 1 || $request->getStateParsing() == ClientRequestInterface::STATE_PARSING_EOM)
             {
                 ## emit request readiness
-                if ($request->getParsingAttr('packets') == 1) {
+                if ($request->getParsingAttr('packets') == 1)
+                {
 
                     // for admin stats
                     $client->hits++;
@@ -184,7 +187,8 @@ class Httpd extends EventEmitter implements HttpdInterface
                 }
 
                 ## we reached EOM, lets be prepared to parse a new request on the same channel
-                if ($status === true) {
+                if ($status === true)
+                {
                     $this->onClientRequestEOM($request);
                 }
             }
@@ -220,7 +224,7 @@ class Httpd extends EventEmitter implements HttpdInterface
      * Actions to take when we client has received all the data
      *
      * @param ClientRequestInterface $request
-     * @param bool $closeStream
+     * @param bool                   $closeStream
      */
     public function onClientRequestDone(ClientRequestInterface $request, $closeStream = false)
     {
@@ -257,7 +261,8 @@ class Httpd extends EventEmitter implements HttpdInterface
      * After handling incoming client's request data, this method notifies to take action
      *
      * @param ClientRequestInterface $request
-     * @param callable         $fallbackCallback when no listeners found, use this callback
+     * @param callable               $fallbackCallback when no listeners found, use this callback
+     *
      * @emit request.HOST:PORT
      */
     public function onClientRequestReadyForVhost(ClientRequestInterface $request, callable $fallbackCallback = null)
@@ -298,14 +303,12 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     public function onProxy($vhostConfig, ClientRequestInterface $clientRequest)
     {
-        $vhost = NULL;
+        $vhost = null;
 
-        if (is_array($vhostConfig)) {
+        if (is_array($vhostConfig))
             $vhost = VhostFactory::create($this, $vhostConfig, $clientRequest->getScheme(), $clientRequest->getHost(), $clientRequest->getPort());
-        }
-        else if ($vhostConfig instanceof Vhost) {
+        else if ($vhostConfig instanceof Vhost)
             $vhost = $vhostConfig;
-        }
 
         $vhost->connectToUpstreamServer($clientRequest)->then(
             function ($info) use ($vhost, $clientRequest)
@@ -314,12 +317,9 @@ class Httpd extends EventEmitter implements HttpdInterface
                 $stream = $info['stream'];
 
                 $this->upstreamRequestFactory($stream, $vhost, $clientRequest);
-
                 if ($status == 'new')
                 {
-
                     $this->upstreamRequestProcess($vhost);
-
                     $stream->on('data', function ($data) use ($stream)
                     {
                         $this->onUpstreamRequestData($stream, $data);
@@ -353,7 +353,6 @@ class Httpd extends EventEmitter implements HttpdInterface
                         ->setStream($stream)
                         ->setState(UpstreamRequestInterface::STATE_CONNECTED)
                         ->setStateParsing(ClientRequestInterface::STATE_PARSING_PENDING);
-        //->send();
 
         $stream->hits++;
         $stream->resource = $upstreamRequest->getUrl();
@@ -385,7 +384,8 @@ class Httpd extends EventEmitter implements HttpdInterface
              */
             $status = $request->onInboundData($data);
 
-            if (is_int($status) && $request->getState() == UpstreamRequestInterface::STATE_ERROR) {
+            if (is_int($status) && $request->getState() == UpstreamRequestInterface::STATE_ERROR)
+            {
                 $this->onUpstreamRequestEOM($request);
             }
             // response is ready (has reached EOM)
@@ -420,7 +420,6 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     protected function onUpstreamRequestEOM(UpstreamRequestInterface $request)
     {
-        // remove old processed requests..
         $this->outboundIOManager->removeProp($request->getStream(), 'request');
         $request->getStream()->resource = '';
 
