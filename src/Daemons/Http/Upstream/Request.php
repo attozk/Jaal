@@ -152,7 +152,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         }
 
         // clear buffer when client request has reached EOM
-        if ($this->clientRequest->getStateParsing() == ClientRequestInterface::STATE_PARSING_EOM)
+        if ($this->clientRequest && $this->clientRequest->getStateParsing() == ClientRequestInterface::STATE_PARSING_EOM)
         {
             $this->clientRequest->setParsingAttr('buffer', '');
             $this->setState(self::STATE_RETRIEVING);
@@ -212,24 +212,29 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
                 }
                 else if (isset($parsed['headers']['transfer-encoding']) && preg_match('/chunked/i', $parsed['headers']['transfer-encoding']))
                     $methodEOM = 'chunked';
+                else if ($parsed['code'] == 304 && !isset($parsed['headers']['content-length']))
+                    $methodEOM = 304;
                 // http://stackoverflow.com/a/11375745/394870
-                // 2014/11/8 commenting out as I need to figure out how it can be handled using EventEmitter
-                //else if ($this->protocolVersion == '1.0')
-                //{
-                // $methodEOM = '1.0';
-                //
-                // $this->stream->on('close', function ($stream)
-                // {
-                // $this->stateParsing = self::STATE_PARSING_EOM;
-                // $this->state = self::STATE_EOM;
-                // $this->setExecutionTime();
-                // $this->clientRequest->setExecutionTime()
-                // ->setState(self::STATE_EOM);
-                // //$this->httpd->handleUpstreamInboundRequestDone($this);
-                // });
-                //}
+                else if ($this->protocolVersion == '1.0')
+                {
+                    $methodEOM = '1.0';
+
+                    $this->stream->on('close', function ($stream)
+                    {
+                        $this->stateParsing = self::STATE_PARSING_EOM;
+                        $this->state        = self::STATE_EOM;
+                        $this->setExecutionTime();
+
+                        $this->getClientRequest()->setExecutionTime()
+                             ->setState(ClientRequestInterface::STATE_EOM)
+                             ->hasBeenReplied();
+
+                        $this->httpd->onUpstreamRequestEOM($this);
+                    });
+                }
                 else
                     $errorCode = 400;
+
                 $response = new Response($parsed['code'], $parsed['headers']);
                 $response->setProtocolVersion($parsed['protocol'])
                          ->setReasonPhrase($parsed['reason_phrase']);
@@ -247,7 +252,9 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
 
         if (!$errorCode)
         {
-            if ($methodEOM == 'chunked')
+            if ($methodEOM == 304)
+                $hasReachedEOM = true;
+            else if ($methodEOM == 'chunked')
             {
                 /* http://httpwg.github.io/specs/rfc7230.html#header.transfer-encoding
                 chunked-body = *chunk

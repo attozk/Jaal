@@ -53,6 +53,7 @@ Class Vhost
             'pools'    => [/*
                  $ip:port => array(
                     'hits' => 0,
+                    'bytes' => 0,
                     'streamIds' => array(
                         $stream->id  = array()
                         ...
@@ -78,7 +79,7 @@ Class Vhost
     public function init($arrConfig)
     {
         // add headers to response (i.e. sent to the client)
-        $toClient                         = [];
+        $toClient                             = [];
         $serverToProxy = [];
 
         if (isset($arrConfig['headers']['add']) && is_array($arrConfig['headers']['add']))
@@ -86,7 +87,7 @@ Class Vhost
             foreach ($arrConfig['headers']['add'] as $header => $value)
             {
                 $header = trim(strtolower($header));
-                $value                    = trim($value);
+                $value  = trim($value);
                 $toClient[$header] = $value;
             }
         }
@@ -99,7 +100,7 @@ Class Vhost
                 foreach ($arrConfig['proxy']['headers']['set'] as $header => $value)
                 {
                     $header = trim(strtolower($header));
-                    $value                = trim($value);
+                    $value  = trim($value);
                     $serverToProxy[$header] = $value;
                 }
             }
@@ -125,7 +126,7 @@ Class Vhost
             $arrProxySetHeaders['Connection'] = 'Keep-Alive';
             $arrProxySetHeaders['Keep-Alive'] = 'timeout=' . $arrConfig['upstreams']['keepalive']['timeout'] . ',
             max=' .
-                $arrConfig['upstreams']['keepalive']['max'];
+                                                $arrConfig['upstreams']['keepalive']['max'];
         }
         else
         {
@@ -133,7 +134,7 @@ Class Vhost
         }
 
         $arrConfig['headers']['serverToProxy'] = $serverToProxy;
-        $arrConfig['headers']['toClient'] = $toClient;
+        $arrConfig['headers']['toClient']     = $toClient;
 
         $this->config = new Configuration($arrConfig);
     }
@@ -166,9 +167,7 @@ Class Vhost
         $keepalive = $this->config->get('upstreams.keepalive.timeout');
 
         if ($keepalive)
-        {
             $keepalive .= ':' . $this->config->get('upstreams.keepalive.max');
-        }
 
         $timeout = $this->config->get('upstreams.timeout');
         $poolKey = $ip . ':' . $port;
@@ -198,16 +197,20 @@ Class Vhost
         {
             $this->serverPool['pools'][$key] = [
                 'streamIds' => [
-                    $id => ['id' => $id]
+                    $id => $id
                 ]
             ];
         }
-        else if (!isset($this->serverPools['pools'][$key]['streamIds'][$id]))
+        else if (!isset($this->serverPool['pools'][$key]['streamIds'][$id]))
         {
-            $this->serverPools['pools'][$key]['streamIds'][$id] = ['id' => $id];
+            $this->serverPool['pools'][$key]['streamIds'][$id] = $id;
         }
 
         return $this;
+    }
+
+    public function getServerPool($key)
+    {
     }
 
     /**
@@ -257,8 +260,8 @@ Class Vhost
             }
             else
             {
-                $rnd   = array_rand($this->serverPool['pools'][$key]['streamIds']);
-                $value = $this->serverPool['pools'][$key]['streamIds'][$rnd];
+                if (count($this->serverPool['pools'][$key]['streamIds']))
+                    $value = array_rand($this->serverPool['pools'][$key]['streamIds']);
             }
         }
 
@@ -273,6 +276,10 @@ Class Vhost
     public function getQueueRequests()
     {
         return $this->serverPool['requests'];
+    }
+
+    public function enqueueRequest($upstreamRequest)
+    {
     }
 
     /**
@@ -292,37 +299,35 @@ Class Vhost
 
         $stream = null;
 
-        //if ($keepalive && ($streamInfo = $this->getServerStream($poolKey)) && ($stream = $this->httpd->outboundIOManager->getStreamById($streamInfo['id'])))
-        //{
-        //    Logger::getInstance()->log(-99, sprintf('%-25s' . $poolKey . "\n" .
-        //                                            "\t" . 'Client-' . $this->httpd->debugStream($clientRequest->getStream(), "\t") . "\n" .
-        //                                            "\t" . 'Upstream-' . $this->httpd->debugStream($stream, "\t") . "\n" .
-        //                                            "\t" . $this->httpd->debugVhost($this), 'VHOST-STREAM[KA=1]'));
-        //
+        if ($keepalive && ($id = $this->getServerStream($poolKey)) && ($stream = $this->httpd->outboundIOManager->getStreamById($id)))
+        {
+            Logger::getInstance()->log(-99, sprintf('%-25s' . $poolKey . "\n" .
+                                                    "\t" . 'Client-' . $this->httpd->debugStream($clientRequest->getStream(), "\t") . "\n" .
+                                                    "\t" . 'Upstream-' . $this->httpd->debugStream($stream, "\t") . "\n" .
+                                                    "\t" . $this->httpd->debugVhost($this), 'VHOST-STREAM[KA=1]'));
 
-        //        $info = ['status' => 'keepalive', 'stream' => $stream];
-        //        $deferred->resolve($info);
-        //}
+            $info = ['status' => 'keepalive', 'stream' => $stream];
+            $deferred->resolve($info);
+        }
 
         if ($stream == null)
         {
             $this->httpd->outboundIOManager->buildConnector($ip, $port)->then(
                 function (Stream $stream) use ($deferred, $poolKey, $clientRequest)
                 {
-                    //$this->addServerStream($poolKey, $stream);
-                    //$stream->on('close', function ($stream) use ($poolKey)
-                    //{
-                    //    //$this->removeServerStream($poolKey, $stream);
-                    //   // print_r($this->serverPool);
-                    //});
-
-                    $info = ['status' => 'new', 'stream' => $stream];
-                    $deferred->resolve($info);
+                    $this->addServerStream($poolKey, $stream);
+                    $stream->on('close', function ($stream) use ($poolKey)
+                    {
+                        $this->removeServerStream($poolKey, $stream);
+                    });
 
                     Logger::getInstance()->log(-99, sprintf('%-25s' . $poolKey . "\n" .
                                                             "\t" . 'Client-' . $this->httpd->debugStream($clientRequest->getStream(), "\t") . "\n" .
                                                             "\t" . 'Proxy-' . $this->httpd->debugStream($stream, "\t") . "\n" .
                                                             "\t" . $this->httpd->debugVhost($this), 'VHOST-STREAM-NEW'));
+
+                    $info = ['status' => 'new', 'stream' => $stream];
+                    $deferred->resolve($info);
                 },
                 function ($error) use ($deferred)
                 {

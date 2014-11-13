@@ -233,14 +233,6 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
             $message           = $this->response->getRawHeaders() . "\r\n" . $buffer;
             $this->headersSent = TRUE;
             $this->state       = self::STATE_SENDING;
-
-            Logger::getInstance()
-                  ->log(
-                      -99,
-                      'REPLYING (' . $this->state . ') ' . Logger::getInstance()->color(
-                          $this->getUrl(),
-                          'red') .
-                      ' using stream: ' . Logger::getInstance()->color($this->stream->id, 'green'));
         }
         else
             $message = $buffer;

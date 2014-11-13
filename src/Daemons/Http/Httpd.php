@@ -100,6 +100,40 @@ class Httpd extends EventEmitter implements HttpdInterface
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     #######################################################################################
     ##
     ##              Inbound Client Code
@@ -147,7 +181,6 @@ class Httpd extends EventEmitter implements HttpdInterface
         /** @var $request ClientRequest */
         if ($request = $this->inboundIOManager->getProp($client, 'request'))
         {
-
             /**
              * $status values:
              * NULL     being processed
@@ -156,16 +189,13 @@ class Httpd extends EventEmitter implements HttpdInterface
              */
             $status = $request->onInboundData($data);
             if (is_int($status) && $request->getState() == ClientRequestInterface::STATE_ERROR)
-            {
                 $request->error($status, '', true);
-            }
             // Request is ready to emit and/or EOM
             else if ($request->getParsingAttr('packets') == 1 || $request->getStateParsing() == ClientRequestInterface::STATE_PARSING_EOM)
             {
                 ## emit request readiness
                 if ($request->getParsingAttr('packets') == 1)
                 {
-
                     // for admin stats
                     $client->hits++;
                     $client->resource = $request->getUrl();
@@ -188,9 +218,7 @@ class Httpd extends EventEmitter implements HttpdInterface
 
                 ## we reached EOM, lets be prepared to parse a new request on the same channel
                 if ($status === true)
-                {
                     $this->onClientRequestEOM($request);
-                }
             }
         }
         // a client cannot send another request until it has finished sending the first one
@@ -252,9 +280,6 @@ class Httpd extends EventEmitter implements HttpdInterface
 
         if (!$keepAlive)
             $request->getStream()->end();
-
-        $request->cleanup();
-        unset($request);
     }
 
     /**
@@ -317,9 +342,10 @@ class Httpd extends EventEmitter implements HttpdInterface
                 $stream = $info['stream'];
 
                 $this->upstreamRequestFactory($stream, $vhost, $clientRequest);
+                $this->upstreamRequestProcess($vhost);
+
                 if ($status == 'new')
                 {
-                    $this->upstreamRequestProcess($vhost);
                     $stream->on('data', function ($data) use ($stream)
                     {
                         $this->onUpstreamRequestData($stream, $data);
@@ -418,7 +444,7 @@ class Httpd extends EventEmitter implements HttpdInterface
      *
      * @param UpstreamRequestInterface $request
      */
-    protected function onUpstreamRequestEOM(UpstreamRequestInterface $request)
+    public function onUpstreamRequestEOM(UpstreamRequestInterface $request)
     {
         $this->outboundIOManager->removeProp($request->getStream(), 'request');
         $request->getStream()->resource = '';
@@ -437,14 +463,12 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     public function onUpstreamRequestDone(UpstreamRequestInterface $request, $closeStream = false)
     {
-        $queue             = $request->getVhost()->getQueueRequests();
-        $numQueuedRequests = $queue->count();
         $keepAlive         = true;
 
         if (
             $closeStream ||
             $request->getClientRequest()->getProtocolVersion() == '1.0' ||
-            !$numQueuedRequests ||
+            //!$request->getVhost()->getQueueRequests()->count() ||
             (!$request->getVhost()->config->get('upstreams.keepalive.max') && !$request->getVhost()->config->get('upstreams.keepalive.max'))
         )
         {
@@ -458,6 +482,7 @@ class Httpd extends EventEmitter implements HttpdInterface
             $request->getStream()->end();
 
         $this->upstreamRequestProcess($request->getVhost());
+        $request->getClientRequest()->cleanup();
         $request->cleanup();
         unset($request);
     }

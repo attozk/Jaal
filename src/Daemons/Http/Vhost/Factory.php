@@ -16,22 +16,25 @@ class Factory
     /**
      * Creates a Vhost factory
      *
-     * @param $arrConfig
-     * @param $scheme
-     * @param $host
-     * @param $port
+     * @param \Hathoora\Jaal\Daemons\Http\Httpd $httpd
+     * @param                                   $arrConfig
+     * @param                                   $scheme
+     * @param                                   $host
+     * @param                                   $port
+     *
      * @return Vhost
      */
     public static function create(Httpd $httpd, $arrConfig, $scheme, $host, $port)
     {
         $uniqueName = $scheme . ':' . $host . ':' . $port;
 
-        if (!isset(self::$arrVhosts[$uniqueName])) {
-            $vhost = new Vhost($httpd, $arrConfig);
+        if (!isset(self::$arrVhosts[$uniqueName]))
+        {
+            $vhost                        = new Vhost($httpd, $arrConfig);
             self::$arrVhosts[$uniqueName] = $vhost;
-        } else {
-            $vhost = self::$arrVhosts[$uniqueName];
         }
+        else
+            $vhost = self::$arrVhosts[$uniqueName];
 
         return $vhost;
     }

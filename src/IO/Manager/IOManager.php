@@ -43,9 +43,13 @@ abstract class IOManager
                 'hits'     => &$stream->hits
             ];
 
+            $ioName = 'InboundIOManager';
+            if (get_class($this) == 'Hathoora\Jaal\IO\Manager\OutboundManager')
+                $ioName = 'OutboundIOManager';
+
             Logger::getInstance()->log(-99, sprintf('%-25s' . $stream->id . "\n" .
                                                     "\t" . '[local: ' . $stream->id . ',  remote: ' . $stream->remoteId . ', connect-time: ' . Time::millitimeDiff($stream->millitime) . 'ms, ' .
-                                                    'hits: ' . $stream->hits . ', resource: ' . $stream->resource . ']', 'IOManager-New'));
+                                                    'hits: ' . $stream->hits . ', resource: ' . $stream->resource . ']', $ioName . '-New'));
 
 
             $stream->on('data', function ($data) use ($stream) {
@@ -101,10 +105,14 @@ abstract class IOManager
         $id = $stream->id;
         if (isset($this->streams[$id])) {
 
+            $ioName = 'InboundIOManager';
+            if (get_class($this) == 'Hathoora\Jaal\IO\Manager\OutboundManager')
+                $ioName = 'OutboundIOManager';
+
             Logger::getInstance()->log(-99, sprintf('%-25s' . $stream->id . "\n" .
                                                     "\t" . '[local: ' . $stream->id . ',  remote: ' . $stream->remoteId . ', connect-time: ' . Time::millitimeDiff($stream->millitime) . 'ms, ' .
                                                     'idle-time: ' . Time::millitimeDiff($stream->lastActivity) . 'ms, ' .
-                                                    'hits: ' . $stream->hits . ', resource: ' . $stream->resource . ']', 'IOManager-Remove'));
+                                                    'hits: ' . $stream->hits . ', resource: ' . $stream->resource . ']', $ioName . '-Remove'));
 
             unset($this->streams[$id]);
         }
