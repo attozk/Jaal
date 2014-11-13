@@ -2,6 +2,7 @@
 
 namespace Hathoora\Jaal\IO\Manager;
 
+use Hathoora\Jaal\Logger;
 use Hathoora\Jaal\Util\Time;
 
 abstract class IOManager
@@ -33,7 +34,6 @@ abstract class IOManager
 
             $this->streams[$id] = [
                 'stream' => $stream,
-                'lastActivity' => Time::millitime()
             ];
 
             $this->stats['streams']++;
@@ -43,9 +43,13 @@ abstract class IOManager
                 'hits'     => &$stream->hits
             ];
 
+            Logger::getInstance()->log(-99, sprintf('%-25s' . $stream->id . "\n" .
+                                                    "\t" . '[local: ' . $stream->id . ',  remote: ' . $stream->remoteId . ', connect-time: ' . Time::millitimeDiff($stream->millitime) . 'ms, ' .
+                                                    'hits: ' . $stream->hits . ', resource: ' . $stream->resource . ']', 'IOManager-New'));
+
+
             $stream->on('data', function ($data) use ($stream) {
                 $this->stats['bytes'] += strlen($data);
-                $this->setProp($stream, 'lastActivity', Time::millitime());
             });
 
             $stream->on('close', function ($stream) {
@@ -96,6 +100,12 @@ abstract class IOManager
     {
         $id = $stream->id;
         if (isset($this->streams[$id])) {
+
+            Logger::getInstance()->log(-99, sprintf('%-25s' . $stream->id . "\n" .
+                                                    "\t" . '[local: ' . $stream->id . ',  remote: ' . $stream->remoteId . ', connect-time: ' . Time::millitimeDiff($stream->millitime) . 'ms, ' .
+                                                    'idle-time: ' . Time::millitimeDiff($stream->lastActivity) . 'ms, ' .
+                                                    'hits: ' . $stream->hits . ', resource: ' . $stream->resource . ']', 'IOManager-Remove'));
+
             unset($this->streams[$id]);
         }
 

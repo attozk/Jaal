@@ -3,7 +3,7 @@ jaal:
     - 192.168.1.1
     - 187.76.1.2
   debug:
-      level: info
+      level: -99
       colors: 1
 
   resolver:  8.8.8.8

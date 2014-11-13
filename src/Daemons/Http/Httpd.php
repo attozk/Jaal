@@ -19,12 +19,23 @@ use Hathoora\Jaal\IO\React\SocketClient\Stream;
 use Hathoora\Jaal\Jaal;
 use Hathoora\Jaal\Logger;
 use Hathoora\Jaal\Util\Time;
+use Psr\Log\LoggerInterface;
 use React\EventLoop\LoopInterface;
 use React\Dns\Resolver\Resolver;
 
 /** @event connection */
 class Httpd extends EventEmitter implements HttpdInterface
 {
+    /**
+     * @var \Hathoora\Jaal\Jaal
+     */
+    protected $jaal;
+
+    /**
+     * @var \Psr\Log\LoggerInterface
+     */
+    protected $logger;
+
     /**
      * @var \React\EventLoop\LoopInterface
      */
@@ -34,11 +45,6 @@ class Httpd extends EventEmitter implements HttpdInterface
      * @var \React\Socket\Server
      */
     protected $socket;
-
-    /**
-     * @var \React\Dns\Resolver\Resolver
-     */
-    protected $dns;
 
     /**
      * This takes care of incoming connections, timeouts, stats and so on
@@ -54,19 +60,23 @@ class Httpd extends EventEmitter implements HttpdInterface
      */
     public $outboundIOManager;
 
+    protected $debug = 0;
+
     /**
-     * @param LoopInterface $loop
-     * @param SocketServer  $socket
-     * @param Resolver      $dns
+     * @param \Hathoora\Jaal\Jaal      $jaal
+     * @param LoopInterface            $loop
+     * @param SocketServer             $socket
+     * @param \Psr\Log\LoggerInterface $logger
      */
-    public function __construct(LoopInterface $loop, SocketServer $socket, Resolver $dns)
+    public function __construct(Jaal $jaal, LoopInterface $loop, SocketServer $socket, LoggerInterface $logger)
     {
+        $this->jaal              = $jaal;
         $this->loop              = $loop;
         $this->socket            = $socket;
-        $this->dns               = $dns;
+        $this->logger            = $logger;
         $this->inboundIOManager  = new InboundManager($this->loop, 'http');
-        $this->outboundIOManager = new OutboundManager($this->loop, $dns, 'http');
-        $this->handleClientConnection();
+        $this->outboundIOManager = new OutboundManager($this->loop, $this->jaal->dns, 'http');
+        $this->debug             = true;//$this->jaal->config->get('jaal.debug.level');
     }
 
     /**
@@ -78,6 +88,10 @@ class Httpd extends EventEmitter implements HttpdInterface
     public function listen($port = 80, $host = '127.0.0.1')
     {
         $this->socket->listen($port, $host);
+        $this->socket->on('connection', function (ConnectionInterface $client)
+        {
+            $this->onClientConnect($client);
+        });
     }
 
 
@@ -92,22 +106,16 @@ class Httpd extends EventEmitter implements HttpdInterface
     ##  Following code is for requests coming to jaal server from clients (or browsers)
     ##
     /**
-     * This method handles client connections
+     * Handles client's connection
+     *
+     * @param ConnectionInterface $client
      */
-    private function handleClientConnection()
+    protected function onClientConnect(ConnectionInterface $client)
     {
-        $this->socket->on('connection', function (ConnectionInterface $client) {
-
-            $this->inboundIOManagerAddNewRequestProperty($client);
-
-            $client->isAllowed($client)->then(
-                function ($client) {
-                    $client->on('data', function ($data) use ($client) {
-
-                        $this->handleClientInboundRequestData($client, $data);
-                    });
-                }
-            );
+        $this->clientRequestFactory($client);
+        $client->on('data', function ($data) use ($client)
+        {
+            $this->onClientRequestData($client, $data);
         });
     }
 
@@ -115,7 +123,7 @@ class Httpd extends EventEmitter implements HttpdInterface
      * Helper method for adding a new request property and setup various elements
      * @param ConnectionInterface $client
      */
-    protected function inboundIOManagerAddNewRequestProperty(ConnectionInterface $client)
+    protected function clientRequestFactory(ConnectionInterface $client)
     {
         $request = new ClientRequest($this);
         $request->setStartTime()
@@ -123,48 +131,8 @@ class Httpd extends EventEmitter implements HttpdInterface
                 ->setStream($client);
 
         $this->inboundIOManager->add($client)
-                               ->setProp($client, 'request', $request)
-                               ->newQueue($client, 'requests');
-
-
-//        if (!$this->inboundIOManager->getProp($client, 'timerTimeout'))
-//        {
-//            $timeout = Jaal::getInstance()->config->get('httpd.timeout');
-//
-//            $timerTimeout = $this->loop->addPeriodicTimer($timeout, function () use ($client) {
-//
-//                Logger::getInstance()->log(-99, Logger::getInstance()->color($stream->id, 'green') .
-//                    ' connection timeout from Inbound Manager, hits: ' . $stream->hits .
-//                    ', connection time: ' . Time::millitimeDiff($stream->millitime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
-//            }
-//        });
-//        $this->setProp($stream, 'timerTimeout', $timerTimeout);
-//
-//        }
-//
-//        $keepaliveTimeout = Jaal::getInstance()->config->get('httpd.keepalive.timeout');
-//
-//
-//
-//        if ($timeout && $keepaliveTimeout && ($keepaliveTimeout * 1.5) < $timeout) {
-//            $timerKeepaliveTimeout = $this->loop->addPeriodicTimer($keepaliveTimeout, function () use ($stream) {
-//                if ($request = $this->getProp($stream, 'request')) {
-//                    if (($timerKeepaliveTimeout = $this->getProp($stream, 'timerKeepaliveTimeout')) &&
-//                        $timerKeepaliveTimeout instanceof TimerInterface)
-//                    {
-//                        $this->loop->cancelTimer($timerKeepaliveTimeout);
-//                        $this->removeProp($stream, 'timerKeepaliveTimeout');
-//                    }
-//
-//                    Logger::getInstance()->log(-99, Logger::getInstance()->color($stream->id, 'green') . ' keep-alive timeout from Inbound Manager, hits: ' .
-//                        $stream->hits . ', connection time: ' . Time::millitimeDiff($stream->millitime) . ' ms ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
-//
-//
-//                    $stream->end();
-//                }
-//            });
-//            $this->setProp($stream, 'timerKeepaliveTimeout', $timerKeepaliveTimeout);
-//        }
+            ->setProp($client, 'request', $request)
+            ->newQueue($client, 'requests');
     }
 
     /**
@@ -173,10 +141,8 @@ class Httpd extends EventEmitter implements HttpdInterface
      * @param ConnectionInterface|\Hathoora\Jaal\IO\React\Socket\Connection $client
      * @param                                                               $data
      */
-    protected function handleClientInboundRequestData(ConnectionInterface $client, $data)
+    protected function onClientRequestData(ConnectionInterface $client, $data)
     {
-        $errorCode = 0;
-
         /** @var $request ClientRequest */
         if ($request = $this->inboundIOManager->getProp($client, 'request')) {
 
@@ -186,13 +152,10 @@ class Httpd extends EventEmitter implements HttpdInterface
              * TRUE     when reached EOM
              * INT      when error code
              */
-            $status = $request->handleInboundData($data);
-            $requestIsDone = FALSE;
-
+            $status = $request->onInboundData($data);
             if (is_int($status) && $request->getState() == ClientRequestInterface::STATE_ERROR)
             {
-                $errorCode = $status;
-                $requestParsingIsDone = true;
+                $request->error($status, '', true);
             }
             // Request is ready to emit and/or EOM
             else if ($request->getParsingAttr('packets') == 1 || $request->getStateParsing() == ClientRequestInterface::STATE_PARSING_EOM)
@@ -207,39 +170,29 @@ class Httpd extends EventEmitter implements HttpdInterface
                     $this->inboundIOManager->getQueue($client, 'requests')
                                            ->enqueue($request);
 
-                    Logger::getInstance()->log(
-                        -50,
-                        'REQUEST ' . $request->getMethod() . ' ' .
-                        Logger::getInstance()->color($request->getUrl(), 'red') .
-                                                    ' using stream: ' . Logger::getInstance()->color($client->id, 'green') . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'yellow'));
-                    //echo "IN QUEUE: ". $this->inboundIOManager->getQueue($client, 'requests')->count() . "\n";
+                    if ($this->debug)
+                        $this->logger->log(-50, sprintf('%-25s' . $this->debugClientRequest($request), 'REQUEST-NEW'));
 
+                    $this->onClientRequestReadyForVhost($request);
+                }
 
-                    $fallback = function () use ($request) {
-                        $request->reply(404, '', true);
-                    };
-
-                    $this->emitClientRequestHandler($request, $fallback);
+                // send the request to upstream
+                if ($request->getUpstreamRequest())
+                {
+                    $request->getUpstreamRequest()->send($request->getParsingAttr('buffer'));
+                    $request->setParsingAttr('buffer', '');
                 }
 
                 ## we reached EOM, lets be prepared to parse a new request on the same channel
                 if ($status === true) {
-                    $requestParsingIsDone = true;
+                    $this->onClientRequestEOM($request);
                 }
             }
-
-            if ($requestParsingIsDone) {
-                $this->handleClientInboundRequestParsingDone($request);
-            }
         }
-        else {
-            $errorCode = 450;
-        }
-
-        // we need to close this connection manually even when keep-alive
-        if ($errorCode) {
-            //$request->error($errorCode, '', true);
-        }
+        // a client cannot send another request until it has finished sending the first one
+        // @TODO: throw friendly (4XX) error?
+        else
+            $client->end();
     }
 
     /**
@@ -247,11 +200,20 @@ class Httpd extends EventEmitter implements HttpdInterface
      *
      * @param ClientRequestInterface $request
      */
-    public function handleClientInboundRequestParsingDone(ClientRequestInterface $request)
+    public function onClientRequestEOM(ClientRequestInterface $request)
     {
         // remove old processed requests..
         $this->inboundIOManager->removeProp($request->getStream(), 'request');
-        $this->inboundIOManagerAddNewRequestProperty($request->getStream());
+
+        if ($request->getProtocolVersion() == '1.0' ||
+            (!$this->jaal->config->get('httpd.keepalive.timeout') && $this->jaal->config->get('httpd.keepalive.max')) ||
+            strcasecmp($request->getHeader('Connection'), 'keep-alive') != 0
+        )
+        {
+            // keep alive negative negative logic is confusing at times...
+        }
+        else
+            $this->clientRequestFactory($request->getStream());
     }
 
     /**
@@ -260,22 +222,32 @@ class Httpd extends EventEmitter implements HttpdInterface
      * @param ClientRequestInterface $request
      * @param bool $closeStream
      */
-    public function handleClientInboundRequestDone(ClientRequestInterface $request, $closeStream = false)
+    public function onClientRequestDone(ClientRequestInterface $request, $closeStream = false)
     {
-        // remove old processed requests..
-        $this->inboundIOManager->removeProp($request->getStream(), 'request');
-
-        if (
-            $closeStream ||
-            (!Jaal::getInstance()->config->get('httpd.keepalive.max') && !Jaal::getInstance()
-                    ->config->get('httpd.keepalive.max')) ||
-            $request->getProtocolVersion() == '1.0'
-        ) {
-            $request->getStream()->end();
-        } // keep connection alive
-        else {
-            $this->inboundIOManagerAddNewRequestProperty($request->getStream());
+        // if we already have a request which errored out before reaching parsing end, then lets remove it
+        if (($currentInboundUnParsedRequest = $this->inboundIOManager->getProp($request->getStream(), 'request')) &&
+            $currentInboundUnParsedRequest->id == $request->id
+        )
+        {
+            $this->onClientRequestEOM($request);
         }
+
+        $keepAlive = true;
+
+        if ($closeStream ||
+            $request->getProtocolVersion() == '1.0' ||
+            (!$this->jaal->config->get('httpd.keepalive.timeout') && $this->jaal->config->get('httpd.keepalive.max')) ||
+            strcasecmp($request->getHeader('Connection'), 'keep-alive') != 0
+        )
+        {
+            $keepAlive = false;
+        }
+
+        if ($this->debug)
+            $this->logger->log(-50, sprintf('%-25s' . $this->debugClientRequest($request), 'REQUEST-DONE[KA=' . ($keepAlive ? '1' : 0) . ']'));
+
+        if (!$keepAlive)
+            $request->getStream()->end();
 
         $request->cleanup();
         unset($request);
@@ -288,12 +260,24 @@ class Httpd extends EventEmitter implements HttpdInterface
      * @param callable         $fallbackCallback when no listeners found, use this callback
      * @emit request.HOST:PORT
      */
-    public function emitClientRequestHandler(ClientRequestInterface $request, callable $fallbackCallback = NULL)
+    public function onClientRequestReadyForVhost(ClientRequestInterface $request, callable $fallbackCallback = null)
     {
         $emitEvent = 'request.' . $request->getHost() . ':' . $request->getPort();
-        Logger::getInstance()->log(-99, 'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
         $this->emit($emitEvent, [$request], $fallbackCallback);
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -312,41 +296,39 @@ class Httpd extends EventEmitter implements HttpdInterface
      * @param                        $vhostConfig array|Vhost
      * @param ClientRequestInterface $clientRequest
      */
-    public function proxy($vhostConfig, ClientRequestInterface $clientRequest)
+    public function onProxy($vhostConfig, ClientRequestInterface $clientRequest)
     {
         $vhost = NULL;
-        Logger::getInstance()->log(-50, 'PROXY ' . $clientRequest->getMethod() . ' ' .Logger::getInstance()->color($clientRequest->getUrl(), 'red') .
-            ' using stream: ' .Logger::getInstance()->color($clientRequest->getStream()->id, 'green') . ' ' .
-            Logger::getInstance()->color('[' . __METHOD__ . ']', 'yellow'));
 
         if (is_array($vhostConfig)) {
-            $vhost = VhostFactory::create($vhostConfig, $clientRequest->getScheme(), $clientRequest->getHost(), $clientRequest->getPort());
+            $vhost = VhostFactory::create($this, $vhostConfig, $clientRequest->getScheme(), $clientRequest->getHost(), $clientRequest->getPort());
         }
         else if ($vhostConfig instanceof Vhost) {
             $vhost = $vhostConfig;
         }
 
-        $arrUpstreamConfig = $vhost->getUpstreamConnectorConfig();
+        $vhost->connectToUpstreamServer($clientRequest)->then(
+            function ($info) use ($vhost, $clientRequest)
+            {
+                $status = $info['status'];
+                $stream = $info['stream'];
 
-        $ip        = $arrUpstreamConfig['ip'];
-        $port      = $arrUpstreamConfig['port'];
-        $keepalive = $arrUpstreamConfig['keepalive'];
-        $timeout   = $arrUpstreamConfig['timeout'];
-        $keepAliveHash = $ip . ':' . $clientRequest->getStream()->getRemoteAddress();
+                $this->upstreamRequestFactory($stream, $vhost, $clientRequest);
 
-        $this->outboundIOManager->buildConnector($ip, $port, $keepalive, $timeout, $keepAliveHash)->then(
-            function (Stream $stream) use ($vhost, $clientRequest) {
+                if ($status == 'new')
+                {
 
-                $this->outboundIOManagerAddNewRequestProperty($stream, $vhost, $clientRequest->getStream());
+                    $this->upstreamRequestProcess($vhost);
 
-                $stream->on('data', function ($data) use ($stream) {
-                    $this->handleUpstreamInboundRequestData($stream, $data);
-                });
+                    $stream->on('data', function ($data) use ($stream)
+                    {
+                        $this->onUpstreamRequestData($stream, $data);
+                    });
+                }
             },
-            function ($error) use ($clientRequest) {
-
-                // we need to close this connection manually even when keep-alive
-                $clientRequest->error(500, '', TRUE);
+            function ($error) use ($clientRequest)
+            {
+                $clientRequest->error(500, '', true);
             }
         );
     }
@@ -354,129 +336,142 @@ class Httpd extends EventEmitter implements HttpdInterface
     /**
      * Helper method for adding a new request property and setup various elements
      *
-     * @param Stream              $stream
-     * @param Vhost               $vhost
-     * @param ConnectionInterface $client
-     * @return int number of client requests in queue
+     * @param Stream                 $stream
+     * @param Vhost                  $vhost
+     * @param ClientRequestInterface $clientRequest
+     *
+     * @return \Hathoora\Jaal\Daemons\Http\Upstream\Request
      */
-    protected function outboundIOManagerAddNewRequestProperty(Stream $stream, $vhost, ConnectionInterface $client)
+    protected function upstreamRequestFactory(Stream $stream, $vhost, ClientRequestInterface $clientRequest)
     {
-        $numQueuedRequests = 0;
-        $queue            = $this->inboundIOManager->getQueue($client, 'requests');
+        if ($this->debug)
+            $this->logger->log(-50, sprintf('%-25s' . $this->debugClientRequest($clientRequest) . "\n" .
+                                            "\t" . $this->debugVhost($vhost), 'UPSTREAM-REQ-NEW'));
 
-        //echo "checking for outboundIOManagerAddNewRequestProperty has " .  $queue->count() . "\n";
+        $upstreamRequest = new UpstreamRequest($this, $vhost, $clientRequest);
+        $upstreamRequest->setStartTime()
+                        ->setStream($stream)
+                        ->setState(UpstreamRequestInterface::STATE_CONNECTED)
+                        ->setStateParsing(ClientRequestInterface::STATE_PARSING_PENDING);
+        //->send();
 
-        if ($queue && $queue->count() && ($clientRequest = $queue->dequeue()))
-        {
-            $numQueuedRequests = $queue->count();
-            $upstreamRequest  = new UpstreamRequest($this, $vhost, $clientRequest);
-            $upstreamRequest->setStartTime()
-                            ->setStream($stream)
-                            ->setState(UpstreamRequestInterface::STATE_CONNECTED)
-                            ->setStateParsing(ClientRequestInterface::STATE_PARSING_PENDING)
-                            ->send();
+        $stream->hits++;
+        $stream->resource = $upstreamRequest->getUrl();
+        $this->outboundIOManager->add($stream)
+                                ->setProp($stream, 'request', $upstreamRequest)
+            ->stats['hits']++;
 
-            $stream->hits++;
-            $this->outboundIOManager->add($stream)
-                                    ->setProp($stream, 'request', $upstreamRequest)
-                ->stats['hits']++;
-        }
+        $vhost->getQueueRequests()->enqueue($upstreamRequest);
 
-        return $numQueuedRequests;
+        return $upstreamRequest;
     }
 
     /**
-     * Similar to handleClientInboundRequestData, this method handle's response data from upstream and makes sense of it
+     * Similar to onClientRequestData, this method handle's response data from upstream and makes sense of it
      *
      * @param Stream $stream
      * @param        $data
      */
-    protected function handleUpstreamInboundRequestData(Stream $stream, $data)
+    protected function onUpstreamRequestData(Stream $stream, $data)
     {
-        $errorCode = 0;
-
         /** @var $request UpstreamRequestInterface */
         if ($request = $this->outboundIOManager->getProp($stream, 'request'))
         {
-
             /**
              * $status values:
              * NULL     being processed
              * TRUE     when reached EOM
              * INT      when error code
              */
-            $status = $request->handleInboundData($data);
-            $requestIsDone = FALSE;
+            $status = $request->onInboundData($data);
 
             if (is_int($status) && $request->getState() == UpstreamRequestInterface::STATE_ERROR) {
-                $errorCode = $status;
-                $requestIsDone = TRUE;
+                $this->onUpstreamRequestEOM($request);
             }
             // response is ready (has reached EOM)
-            else if ($status === true && $request->getStateParsing() == UpstreamRequestInterface::STATE_PARSING_EOM)
+            else
             {
+                // send response to client
+                $request->getClientRequest()->onOutboundData($request->getParsingAttr('buffer'));
+                $request->setParsingAttr('buffer', '');
+
                 ## we reached EOM, lets be prepared to parse a new request on the same channel
-                if ($status === true) {
+                if ($status === true && $request->getStateParsing() == UpstreamRequestInterface::STATE_PARSING_EOM)
+                {
+                    $request->getClientRequest()->setExecutionTime()
+                            ->setState(ClientRequestInterface::STATE_EOM)
+                            ->hasBeenReplied();
 
-                    $requestIsDone = TRUE;
-                    Logger::getInstance()->log(
-                        -50,
-                        'REPLIED ' . $request->getMethod() . ' ' . Logger::getInstance()
-                                                                         ->color($request->getUrl(), 'red') .
-                        ' using stream: ' . Logger::getInstance()->color($stream->id, 'green')
-                        . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'yellow'));
-
+                    $this->onUpstreamRequestEOM($request);
                 }
             }
+        }
+        // upstream should handle only one request at a time
+        // @TODO: how to handle requests in queue (of $vhost->getQueueRequests())?
+        else
+            $stream->end();
+    }
 
-            if ($requestIsDone)
-            {
-                $this->handleUpstreamInboundRequestDone($request);
-            }
-        }
-        else {
-            $errorCode = 450;
-        }
+    /**
+     * Actions to take when we got entire message (reply) from the upstream server, at this point we are ready
+     * to handle next request in queue of vhost (for upstream server)
+     *
+     * @param UpstreamRequestInterface $request
+     */
+    protected function onUpstreamRequestEOM(UpstreamRequestInterface $request)
+    {
+        // remove old processed requests..
+        $this->outboundIOManager->removeProp($request->getStream(), 'request');
+        $request->getStream()->resource = '';
 
-        // we need to close this connection manually even when keep-alive
-        if ($errorCode) {
-            #echo "\n\n\n\n---------------------ERROR\n";
-            #echo __FUNCTION__ . " -----> $errorCode ($data)\n";
-            #echo "\n---------------------ERROR\n\n\n\n";
-            // $request->reply($errorCode, '', true);
-        }
+        if ($this->debug)
+            $this->logger->log(-50, sprintf('%-25s' . $this->debugUpstreamRequest($request), 'UPSTREAM-REQ-EOM'));
+
+        $this->onUpstreamRequestDone($request);
     }
 
     /**
      * Actions to take when we got the reply from upstream server
      *
      * @param UpstreamRequestInterface $request
-     * @param bool $closeStream
+     * @param bool                     $closeStream
      */
-    public function handleUpstreamInboundRequestDone(UpstreamRequestInterface $request, $closeStream = false)
+    public function onUpstreamRequestDone(UpstreamRequestInterface $request, $closeStream = false)
     {
-        // remove old processed requests..
-        $this->outboundIOManager->removeProp($request->getStream(), 'request');
+        $queue             = $request->getVhost()->getQueueRequests();
+        $numQueuedRequests = $queue->count();
+        $keepAlive         = true;
 
-        $numQueuedRequests = $this->outboundIOManagerAddNewRequestProperty(
-            $request->getStream(),
-            $request->getVhost(),
-            $request->getClientRequest()->getStream());
-
-        // close upstream connection?
         if (
-            (!$numQueuedRequests &&
-                (
-                    $request->getClientRequest()->getProtocolVersion() == '1.0' ||
-                    (!$request->getVhost()->config->get('upstreams.keepalive.max') && !$request->getVhost()->config->get('upstreams.keepalive.max'))
-                )
-            ) || $closeStream
-        ) {
-            $request->getStream()->end();
+            $closeStream ||
+            $request->getClientRequest()->getProtocolVersion() == '1.0' ||
+            !$numQueuedRequests ||
+            (!$request->getVhost()->config->get('upstreams.keepalive.max') && !$request->getVhost()->config->get('upstreams.keepalive.max'))
+        )
+        {
+            $keepAlive = false;
         }
 
+        if ($this->debug)
+            $this->logger->log(-50, sprintf('%-25s' . $this->debugUpstreamRequest($request), 'UPSTREAM-REQ-DONE[KA=' . ($keepAlive ? '1' : 0) . ']'));
+
+        if (!$keepAlive)
+            $request->getStream()->end();
+
+        $this->upstreamRequestProcess($request->getVhost());
         $request->cleanup();
         unset($request);
+    }
+
+    /**
+     * Starts sending upstream request to upstream server
+     *
+     * @param $vhost
+     */
+    protected function upstreamRequestProcess($vhost)
+    {
+        if ($vhost->getQueueRequests()->count() && ($nextRequest = $vhost->getQueueRequests()->dequeue()))
+            $nextRequest->send();
     }
 
     /**
@@ -492,20 +487,86 @@ class Httpd extends EventEmitter implements HttpdInterface
 
 
 
-//    /**
-//     * After receiving client's request response and about to reply back to client, this function notifies to take any
-//     * action.
-//
-//     *
-//     * @param ClientRequestInterface $request
-//     * @param callable         $fallbackCallback when no listeners found, use this callback
-//     * @emit response:HOST:PORT
-//     */
-//    public function emitClientResponseHandler(ClientRequestInterface $request, callable $fallbackCallback = null)
-//    {
-//        $emitEvent = 'response.' . $request->getHost() . ':' . $request->getPort();
-//        Logger::getInstance()->log(-99, 'EMIT ' . $emitEvent . ' ' . Logger::getInstance()->color('[' . __METHOD__ . ']', 'lightCyan'));
-//        $this->emit($emitEvent, [$request], $fallbackCallback);
-//    }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    ####################################################################################################################
+    ##
+    ##                      Debugging..
+    ##
+    /**
+     * Returns a format string about this request for debugging
+     *
+     * @param \Hathoora\Jaal\Daemons\Http\Client\RequestInterface $request
+     * @param string                                              $multilineAppender
+     *
+     * @return string
+     */
+    public function debugClientRequest(ClientRequestInterface $request, $multilineAppender = '')
+    {
+        return sprintf($request->getMethod() . ' HTTP ' . $request->getProtocolVersion() . ' ' . $request->getUrl() . ($request->getState() == ClientRequestInterface::STATE_DONE ? ' Took: ' . $request->getExecutionTime() . 'ms' : '') . "\n" .
+                       $multilineAppender . "\t" . '%-15s [Connection: ' . ($request->getHeader('Connection') ? $request->getHeader('Connection') : '-') . '] HTTP ' . $request->getProtocolVersion() . "\n" .
+                       $multilineAppender . "\t" . '%-15s [eom-strategy: ' . $request->getParsingAttr('methodEOM') . ', packet: ' . $request->getParsingAttr('packets') . ', ' .
+                       'size: ' . $request->getParsingAttr('contentLength') . ', consumed: ' . $request->getParsingAttr('consumed') . ']' . "\n" .
+                       $multilineAppender . "\t" . $this->debugStream($request->getStream()), 'Headers:', 'Parsing:');
+    }
+
+    /**
+     * Returns a format string about this request for debugging
+     *
+     * @param \Hathoora\Jaal\Daemons\Http\Upstream\RequestInterface $request
+     * @param string                                                $multilineAppender
+     *
+     * @return string
+     */
+    public function debugUpstreamRequest(UpstreamRequestInterface $request, $multilineAppender = '')
+    {
+        return sprintf($request->getMethod() . ' HTTP ' . $request->getProtocolVersion() . ' ' . $request->getUrl() . ($request->getState() == ClientRequestInterface::STATE_DONE ? ' Took: ' . $request->getExecutionTime() . 'ms' : '') . "\n" .
+                       $multilineAppender . "\t" . 'Headers: [Connection: ' . ($request->getHeader('Connection') ? $request->getHeader('Connection') : '-') . '] HTTP ' . $request->getProtocolVersion() . "\n" .
+                       $multilineAppender . "\t" . 'Parsing: [eom-strategy: ' . $request->getParsingAttr('methodEOM') . ', packet: ' . $request->getParsingAttr('packets') . ', ' .
+                       'size: ' . $request->getParsingAttr('contentLength') . ', consumed: ' . $request->getParsingAttr('consumed') . ']' . "\n" .
+                       $multilineAppender . "\t" . $this->debugStream($request->getStream()));
+    }
+
+    /**
+     * Returns a format string about this stream
+     *
+     * @param $stream Stream|ConnectionInterface
+     *
+     * @return string
+     */
+    public function debugStream($stream)
+    {
+        return sprintf('%-15s ' . $stream->id . ', [local: ' . $stream->id . ', remote: ' . $stream->remoteId . ', hits: ' . $stream->hits . ', ' . 'connect-time: ' . Time::millitimeDiff($stream->millitime) . 'ms, ' .
+                       'idle-time: ' . Time::millitimeDiff($stream->lastActivity) . 'ms, resource: ' . $stream->resource . ']', 'Stream:');
+    }
+
+    /**
+     * @param \Hathoora\Jaal\Daemons\Http\Vhost\Vhost $vhost
+     *
+     * @return string
+     */
+    public function debugVhost(Vhost $vhost)
+    {
+        return sprintf('%-15s ' . $vhost->id, 'Vhost:');
+    }
 }

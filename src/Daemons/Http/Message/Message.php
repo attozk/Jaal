@@ -193,10 +193,9 @@ abstract class Message implements MessageInterface
      */
     public function getSize()
     {
+        $size = null;
         if ($this->hasHeader('Content-Length')) {
             $size = $this->getHeader('Content-Length');
-        } else {
-            $size = strlen($this->body);
         }
 
         return $size;

@@ -29,7 +29,7 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
      * @param $data
      * @return void
      */
-    public function handleInboundData($data);
+    public function onInboundData($data);
 
     /**
      * Set the upstream request
@@ -69,7 +69,7 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
      * @param $buffer
      * @return self
      */
-    public function reply($buffer);
+    public function onOutboundData($buffer);
 
     /**
      * Respond to client as error
@@ -80,13 +80,6 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
      * @return self
      */
     public function error($code, $message = '', $closeStream = FALSE);
-
-    /**
-     * When the message has been replied to the client, this function needs to be called
-     *
-     * @param bool $closeStream to end the stream after reply (overwrite keep-alive settings)
-     */
-    public function hasBeenReplied($closeStream = FALSE);
 
     public function cleanup();
 }

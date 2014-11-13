@@ -72,7 +72,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
      *      TRUE    when message has reached EOM
      *      INT     when error code
      */
-    public function handleInboundData($data)
+    public function onInboundData($data)
     {
         $hasReachedEOM = $status = null;
         $consumed      =& $this->parsingAttrs['consumed'];
@@ -109,29 +109,24 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
                 isset($parsed['request_url']) && isset($parsed['request_url']['host']))
             {
                 // always assume length to be EOM
-                $methodEOM = 'length';
-                // don't include headers when calculating size of message
-                $body = $parsed['body'];
-                $this->body = $body;
-
-                $httpMethod = strtoupper($parsed['method']);
+                $methodEOM    = 'length';
+                $body         = $parsed['body'];
+                $httpMethod   = strtoupper($parsed['method']);
+                $this->body   = $body;
                 $this->method = $httpMethod;
                 $this->protocolVersion = $parsed['protocol_version'];
-
                 $this->setScheme($parsed['request_url']['scheme'])
-                     ->setHost($parsed['request_url']['host'])
-                     ->setPath($parsed['request_url']['path'])
-                     ->setPort($parsed['request_url']['port'])
-                     ->setQuery($parsed['request_url']['query']);
+                    ->addHeaders($parsed['headers'])
+                    ->setHost($parsed['request_url']['host'])
+                    ->setPath($parsed['request_url']['path'])
+                    ->setPort($parsed['request_url']['port'])
+                    ->setQuery($parsed['request_url']['query']);
 
-                if (isset($parsed['headers']['content-length'])) {
-                    $contentLength = $parsed['headers']['content-length'];
-                }
+                $contentLength = $this->getSize();
 
                 // POST|PUT must have content length if body is present
-                if (($httpMethod == 'PUT' || $httpMethod == 'POST') && $contentLength == 0 && $body) {
+                if (($httpMethod == 'PUT' || $httpMethod == 'POST') && $contentLength == 0 && $body)
                     $errorCode = 401;
-                }
             }
             // we are unable to parse this request, its bad..
             else {
@@ -142,11 +137,6 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
         else {
             $body = $data;
             $buffer .= $data;
-
-            if ($this->upstreamRequest) {
-                $this->upstreamRequest->send($buffer);
-                $buffer = ''; // reset buffer
-            }
         }
 
         if (!$errorCode) {
@@ -233,7 +223,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
      * @param $buffer
      * @return self
      */
-    public function reply($buffer)
+    public function onOutboundData($buffer)
     {
         $message = NULL;
 
@@ -301,7 +291,7 @@ Class Request extends \Hathoora\Jaal\Daemons\Http\Message\Request implements Req
     public function hasBeenReplied($closeStream = FALSE)
     {
         $this->setState(self::STATE_DONE);
-        $this->httpd->handleClientInboundRequestDone($this, $closeStream);
+        $this->httpd->onClientRequestDone($this, $closeStream);
     }
 
 

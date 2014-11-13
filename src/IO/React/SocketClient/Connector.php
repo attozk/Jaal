@@ -7,7 +7,7 @@ use React\EventLoop\LoopInterface;
 
 class Connector extends \React\SocketClient\Connector
 {
-    public $loop;
+    private $loop;
 
     public function __construct(LoopInterface $loop, Resolver $resolver)
     {

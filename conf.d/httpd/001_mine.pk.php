@@ -1,7 +1,7 @@
 <?php
 
-$httpd->on('request.mine.pk:81',
-function (\Hathoora\Jaal\Daemons\Http\Client\RequestInterface $request) use ($httpd) {
+$httpd->on('request.mine.pk:81', function (\Hathoora\Jaal\Daemons\Http\Client\RequestInterface $request) use ($httpd)
+{
 
     $arrVhostConfig = [
         'httpVersion' => '1.1',    // default
@@ -47,10 +47,10 @@ function (\Hathoora\Jaal\Daemons\Http\Client\RequestInterface $request) use ($ht
         ],
 
         'upstreams'         => [
-            'keepalive' => array(
-                'timeout' => 10,
-                'max' => 100
-            ),
+            #            'keepalive' => array(
+            #                'timeout' => 10,
+            #                'max' => 100
+            #            ),
 
             'servers' => [
                 'server1' => [
@@ -62,7 +62,5 @@ function (\Hathoora\Jaal\Daemons\Http\Client\RequestInterface $request) use ($ht
         ]
     ];
 
-    //$request->reply(200);
-
-    $httpd->proxy($arrVhostConfig, $request);
+    $httpd->onProxy($arrVhostConfig, $request);
 });

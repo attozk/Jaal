@@ -51,7 +51,7 @@ Interface RequestInterface extends \Hathoora\Jaal\Daemons\Http\Message\RequestIn
      * @param        $data
      * @return mixed
      */
-    public function handleInboundData($data);
+    public function onInboundData($data);
 
     /**
      * Upstream reply is client's request response

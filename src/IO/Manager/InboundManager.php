@@ -29,39 +29,4 @@ class InboundManager extends IOManager
         $this->loop = $loop;
         $this->protocol = $protocol;
     }
-
-    public function add($stream)
-    {
-        $notAdded = FALSE;
-        if (!isset($this->streams[$stream->id])) {
-            $notAdded = TRUE;
-            Logger::getInstance()->log(-99, Logger::getInstance()->color($stream->id,
-                                                                         'green') . ' / ' . $stream->remoteId .
-                                            ' has been added to Inbound Manager, hits: ' .
-                                            $stream->hits . ', connection time: ' .
-                                            Time::millitimeDiff($stream->millitime) . ' ms ' .
-                                            Logger::getInstance()->color('[' . __METHOD__ . ']',
-                                                                         'lightCyan'));
-            parent::add($stream);
-        }
-
-        return $this;
-    }
-
-    public function remove($stream)
-    {
-
-        $id = $stream->id;
-        if (isset($this->streams[$id])) {
-            Logger::getInstance()->log(-99, Logger::getInstance()->color($stream->id,
-                                                                         'green') . ' / ' . $stream->remoteId .
-                                            ' has been removed from Inbound Manager, hits: ' .
-                                            $stream->hits . ', connection time: ' .
-                                            Time::millitimeDiff($stream->millitime) . ' ms ' .
-                                            Logger::getInstance()->color('[' . __METHOD__ . ']',
-                                                                         'lightCyan'));
-        }
-
-        return parent::remove($stream);
-    }
 }
