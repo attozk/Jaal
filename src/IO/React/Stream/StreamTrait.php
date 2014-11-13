@@ -3,9 +3,8 @@
 namespace Hathoora\Jaal\IO\React\Stream;
 
 use Hathoora\Jaal\Util\Time;
-use React\EventLoop\LoopInterface;
 
-class Stream extends \React\Stream\Stream
+trait StreamTrait
 {
     /**
      * @var string unique identifier
@@ -47,13 +46,16 @@ class Stream extends \React\Stream\Stream
      */
     protected $meta;
 
-    public function __construct($stream, LoopInterface $loop)
+    public function write($data)
     {
-        parent::__construct($stream, $loop);
-        $this->millitime = $this->lastActivity = Time::millitime();
-        $this->id        = stream_socket_get_name($stream, false);
-        $this->remoteId  = stream_socket_get_name($stream, true);
-        $this->hits      = 0;
+        $this->lastActivity = Time::millitime();
+        parent::write($data);
+    }
+
+    public function handleData($stream)
+    {
+        $this->lastActivity = Time::millitime();
+        parent::handleData($stream);
     }
 
     public function getRemoteAddress()
@@ -69,18 +71,6 @@ class Stream extends \React\Stream\Stream
     private function parseAddress($address)
     {
         return trim(substr($address, 0, strrpos($address, ':')), '[]');
-    }
-
-    public function write($data)
-    {
-        $this->lastActivity = Time::millitime();
-        parent::write($data);
-    }
-
-    public function handleData($stream)
-    {
-        $this->lastActivity = Time::millitime();
-        parent::handleData($stream);
     }
 
     /**
